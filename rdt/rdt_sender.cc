@@ -123,10 +123,10 @@ void Sender_FromLowerLayer(struct packet *pkt)
         }
         while (between(ack_expected, f.ack, next_frame_to_send))
         {
+            window_delete(ack_expected);
             Sender_StopTimer(ack_expected);
             //debug
             //fprintf(stdout, "At %.2fs: sender get ack %d  \n", GetSimulationTime(), f.ack);
-            window_delete(ack_expected);
             inc(ack_expected);
         }
     }
@@ -140,7 +140,7 @@ void Sender_Timeout()
 {
     Sender_StopTimer();
     cleartimer();
-    fprintf(stdout, "At %.2fs: Sender_Timeout expect seq:%d\n", GetSimulationTime(), ack_expected);
+    // fprintf(stdout, "At %.2fs: Sender_Timeout expect seq:%d\n", GetSimulationTime(), ack_expected);
 
     next_frame_to_send = ack_expected;
     for (int i = 0; i < MAX_SEQ + 1; i++)
@@ -194,23 +194,31 @@ void Sender_StartTimer(double timeout, seq_nr frame_seq)
 
 void Sender_StopTimer(seq_nr frame_seq)
 {
-    if (virtual_timer->next && virtual_timer->next->next == NULL)
+    if (virtual_timer->next && virtual_timer->next->seq == frame_seq && virtual_timer->next->next == NULL)
     {
         Sender_StopTimer();
         //the only node STOP TIMER NOW
-        virtual_timer->next = NULL;
         delete (virtual_timer->next);
 
+        virtual_timer->next = NULL;
         //  fprintf(stdout, "At %.2fs: sender stop timer %d\n", GetSimulationTime(), frame_seq);
     }
     else if (virtual_timer->next)
     {
         //delete the stopped one
-        delete_timeout_node(frame_seq);
-        if (virtual_timer->next)
+        if (delete_timeout_node(frame_seq) && virtual_timer->next)
         {
-            Sender_StartTimer(0.3);
+            double t = GetSimulationTime() - virtual_timer->next->timeout;
+            if (t > 0.0 && t < 0.3)
+            {
+                Sender_StartTimer(t);
+            }
+            else
+            {
+                Sender_Timeout();
+            }
         }
+
         //  fprintf(stdout, "At %.2fs: sender start timer %d timeout:%e\n", GetSimulationTime(), frame_seq, t);
     }
 }
@@ -230,13 +238,7 @@ bool in_timeout_node(seq_nr frame_seq)
 }
 bool delete_timeout_node(seq_nr frame_seq)
 {
-    Node *cur = virtual_timer->next;
-    if (cur->seq == frame_seq && cur->next == NULL)
-    {
-        delete (cur);
-        virtual_timer->next = NULL;
-        return true;
-    }
+    Node *cur = virtual_timer;
     while (cur && cur->next)
     {
         if (cur->next->seq == frame_seq)
@@ -302,8 +304,9 @@ void send_when_window_available()
 {
     while (!window_isfull())
     {
-        if(msgbuffer.empty())return;
-        message2 *msg = msgbuffer.front(); 
+        if (msgbuffer.empty())
+            return;
+        message2 *msg = msgbuffer.front();
         unsigned int sendsize;
         char *d;
         if (msg->size <= PAYLOADSIZE)
@@ -316,7 +319,7 @@ void send_when_window_available()
         }
         else
         {
-            
+
             sendsize = PAYLOADSIZE;
             d = (char *)malloc(sendsize);
             memcpy(d, msg->data, sendsize);

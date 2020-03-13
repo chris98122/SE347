@@ -38,7 +38,7 @@ packet frame_to_packet(frame *frm)
 bool between(seq_nr a, seq_nr b, seq_nr c) // a is never equal to c
 {
     //return true if a<=b<c circularly ,else return false
-    return (((a <= b) && (b <= c) && (a != c)) || ((c < a) && (a <= b)) || ((b <= c) && (c < a)) || (a==b && b==c));
+     return (((a <= b) && (b < c)) || ((c < a) && (a <= b)) || ((b < c) && (c < a)) || ((a == b) && (b==c)));
 }
 
 bool checksum(struct packet *pkt)

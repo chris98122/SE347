@@ -69,7 +69,7 @@ void Receiver_FromLowerLayer(struct packet *pkt)
             // fprintf(stdout, "At %.2fs: receiver get unexpected seq:%d,size:%d\n", GetSimulationTime(), f.seq, f.size);
         }
     }
-    fprintf(stdout, "At %.2fs: receiver expect frame_expected %d   \n", GetSimulationTime(), frame_expected);
+   //  fprintf(stdout, "At %.2fs: receiver expect frame_expected %d   \n", GetSimulationTime(), frame_expected);
 }
 
 void Receiver_send(frame_kind kind, seq_nr seq, seq_nr ack, int size, char *data)
