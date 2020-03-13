@@ -172,36 +172,35 @@ void cleartimer()
 }
 void Sender_StartTimer(double timeout, seq_nr frame_seq)
 {
-    if (virtual_timer->next == NULL)
+    if (Sender_isTimerSet())
     {
-        virtual_timer->next = new Node(timeout, frame_seq);
-        Sender_StartTimer(0.3);
+        return;
     }
     else
     {
-        Node *cur = virtual_timer->next;
+        Node *cur = virtual_timer;
         while (cur->next)
         {
             cur = cur->next;
         }
         double t = GetSimulationTime() + timeout;
         cur->next = new Node(t, frame_seq);
-
         ASSERT(cur->next->next == 0);
 
         //  fprintf(stdout, "At %.2fs: sender store timer %d %e\n", GetSimulationTime(), frame_seq, t);
+        Sender_StartTimer(0.3);
     }
 }
 
 void Sender_StopTimer(seq_nr frame_seq)
 {
-    if (virtual_timer->next && virtual_timer->next->seq == frame_seq && virtual_timer->next->next == NULL)
+    if (virtual_timer->next && virtual_timer->next->next == NULL)
     {
         Sender_StopTimer();
         //the only node STOP TIMER NOW
+        virtual_timer->next = NULL;
         delete (virtual_timer->next);
 
-        virtual_timer->next = NULL;
         //  fprintf(stdout, "At %.2fs: sender stop timer %d\n", GetSimulationTime(), frame_seq);
     }
     else if (virtual_timer->next)
@@ -231,7 +230,13 @@ bool in_timeout_node(seq_nr frame_seq)
 }
 bool delete_timeout_node(seq_nr frame_seq)
 {
-    Node *cur = virtual_timer;
+    Node *cur = virtual_timer->next;
+    if (cur->seq == frame_seq && cur->next == NULL)
+    {
+        delete (cur);
+        virtual_timer->next = NULL;
+        return true;
+    }
     while (cur && cur->next)
     {
         if (cur->next->seq == frame_seq)
@@ -297,9 +302,8 @@ void send_when_window_available()
 {
     while (!window_isfull())
     {
-        if (msgbuffer.empty())
-            return;
-        message2 *msg = msgbuffer.front();
+        if(msgbuffer.empty())return;
+        message2 *msg = msgbuffer.front(); 
         unsigned int sendsize;
         char *d;
         if (msg->size <= PAYLOADSIZE)
@@ -312,7 +316,7 @@ void send_when_window_available()
         }
         else
         {
-
+            
             sendsize = PAYLOADSIZE;
             d = (char *)malloc(sendsize);
             memcpy(d, msg->data, sendsize);
