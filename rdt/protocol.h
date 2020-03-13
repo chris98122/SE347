@@ -6,6 +6,8 @@
 
 #include "rdt_struct.h"
 #include <stdlib.h>
+#include <malloc.h>
+
 #define MAX_SEQ 7
 #define OVERHEAD 3
 
@@ -29,14 +31,25 @@ struct frame
     frame() {}
 
     frame(frame_kind _kind, seq_nr _seq, seq_nr _ack, char _size, char *_info) : kind(_kind), seq(_seq), ack(_ack), size(_size), info(_info) {}
+     
 };
 struct Node
 {
     double timeout;
     seq_nr seq;
     Node *next;
-    Node(){}
-    Node(double _timeout, seq_nr _seq) : timeout(_timeout), seq(_seq), next(NULL) {}
+    Node() {}
+    Node(double _timeout, seq_nr _seq) : timeout(_timeout), seq(_seq), next(NULL)
+    {
+        next = NULL;
+    }
+};
+
+struct message2
+{
+    int size;
+    char *data;
+    char *c; //for free
 };
 
 frame packet_to_frame(struct packet *pkt);

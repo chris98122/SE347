@@ -33,6 +33,7 @@ void Receiver_Final()
     fprintf(stdout, "At %.2fs: receiver finalizing ...\n", GetSimulationTime());
 }
 
+
 /* event handler, called when a packet is passed from the lower layer at the 
    receiver */
 void Receiver_FromLowerLayer(struct packet *pkt)
@@ -57,7 +58,7 @@ void Receiver_FromLowerLayer(struct packet *pkt)
             msg.size = f.size;
             msg.data = f.info;
 
-           // fprintf(stdout, "At %.2fs: receiver get  seq:%d \n", GetSimulationTime(), frame_expected);
+            // fprintf(stdout, "At %.2fs: receiver get  seq:%d \n", GetSimulationTime(), frame_expected);
 
             Receiver_ToUpperLayer(&msg);
             inc(frame_expected);
@@ -68,6 +69,7 @@ void Receiver_FromLowerLayer(struct packet *pkt)
             // fprintf(stdout, "At %.2fs: receiver get unexpected seq:%d,size:%d\n", GetSimulationTime(), f.seq, f.size);
         }
     }
+    fprintf(stdout, "At %.2fs: receiver expect frame_expected %d   \n", GetSimulationTime(), frame_expected);
 }
 
 void Receiver_send(frame_kind kind, seq_nr seq, seq_nr ack, int size, char *data)

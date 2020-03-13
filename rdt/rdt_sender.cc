@@ -12,30 +12,37 @@
 
 #include "protocol.h"
 
-#define MSGBUF_SIZE 10
+#include <queue>
+
+#define MSGBUF_SIZE 1000
 
 seq_nr next_frame_to_send;
 seq_nr ack_expected;
 frame *window[MAX_SEQ + 1];
-message *msgbuffer[MSGBUF_SIZE];
+std::queue<message2 *> msgbuffer;
 
 Node *virtual_timer;
-
+bool windowfull = false;
+bool ack_add = false;
 void send(frame *f, seq_nr seq);
 void msgbuffer_push_back(struct message *msg);
 void msgbuffer_pop_front();
 void send_when_window_available();
 void window_delete(seq_nr seq);
+bool delete_timeout_node(seq_nr frame_seq);
+bool window_isfull();
+
+// timer api
+bool in_timeout_node(seq_nr frame_seq);
+void cleartimer();
 void Sender_StopTimer(seq_nr frame_seq);
 void Sender_StartTimer(double timeout, seq_nr frame_seq);
-seq_nr get_timeout_frame_num();
-void delete_timeout_node(seq_nr frame_seq);
 
 /* sender initialization, called once at the very beginning */
 void Sender_Init()
 {
     fprintf(stdout, "At %.2fs: sender initializing ...\n", GetSimulationTime());
-    fprintf(stdout, "PAYLOADSIZE %d", PAYLOADSIZE);
+    // fprintf(stdout, "PAYLOADSIZE %d", PAYLOADSIZE);
     // initiallize seq num
     ack_expected = 0;
     next_frame_to_send = 0;
@@ -46,7 +53,7 @@ void Sender_Init()
     virtual_timer = new Node(0, 0);
 
     // initialize additional buffer
-    memset(msgbuffer, 0, sizeof(message *) * MSGBUF_SIZE);
+    msgbuffer = std::queue<message2 *>();
 }
 
 /* sender finalization, called once at the very end.
@@ -58,12 +65,11 @@ void Sender_Final()
     fprintf(stdout, "At %.2fs: sender finalizing ...\n", GetSimulationTime());
 
     //print seq that not delivered
-    for(int i = 0;i<MAX_SEQ;i++)
+    for (int i = 0; i < MAX_SEQ; i++)
     {
-        if(window[i] !=0)
-            fprintf(stdout,"%d",i);
+        if (window[i] != 0)
+            fprintf(stdout, "%d", i);
     }
-    
 }
 
 /* event handler, called when a message is passed from the upper layer at the 
@@ -72,6 +78,21 @@ void Sender_FromUpperLayer(struct message *msg)
 {
 
     // fprintf(stdout, "At %.2fs: Sender_FromUpperLayer\n", GetSimulationTime());
+    //debug
+    if (window_isfull())
+    {
+        fprintf(stdout, "At %.2fs: sender window is full \n", GetSimulationTime());
+
+        fprintf(stdout, "At %.2fs: Sender_Timeout expect seq:%d\n", GetSimulationTime(), ack_expected);
+        if (Sender_isTimerSet())
+        {
+            fprintf(stdout, "At %.2fs: sender time set expect seq:%d\n", GetSimulationTime(), ack_expected);
+        }
+        else
+        {
+            Sender_StartTimer(0);
+        }
+    }
     // put msg into additional buffer
     msgbuffer_push_back(msg);
 
@@ -102,17 +123,12 @@ void Sender_FromLowerLayer(struct packet *pkt)
         }
         while (between(ack_expected, f.ack, next_frame_to_send))
         {
-            //debug
             Sender_StopTimer(ack_expected);
+            //debug
             //fprintf(stdout, "At %.2fs: sender get ack %d  \n", GetSimulationTime(), f.ack);
             window_delete(ack_expected);
             inc(ack_expected);
         }
-    }
-    else
-    { // data type-> ?
-        // nak type ->
-        ASSERT(0);
     }
 
     // if the sender window not full send the additonal buffer
@@ -122,33 +138,43 @@ void Sender_FromLowerLayer(struct packet *pkt)
 /* event handler, called when the timer expires */
 void Sender_Timeout()
 {
-    // get to know the timeout frame number
-    seq_nr seq = get_timeout_frame_num();
+    Sender_StopTimer();
+    cleartimer();
+    fprintf(stdout, "At %.2fs: Sender_Timeout expect seq:%d\n", GetSimulationTime(), ack_expected);
 
-    // get the frame from sender window
-
-    fprintf(stdout, "At %.2fs: sender resend seq:%d\n", GetSimulationTime(), seq);
-    frame *f = window[seq];
-    ASSERT(seq >= 0 && seq <= MAX_SEQ);
-
-    if (f == 0)
-        return;
-
-    delete_timeout_node(seq);
-
-    // resend it
-    send(f, seq);
+    next_frame_to_send = ack_expected;
+    for (int i = 0; i < MAX_SEQ + 1; i++)
+    {
+        if (window[next_frame_to_send] != 0)
+        {
+            send(window[next_frame_to_send], next_frame_to_send);
+            fprintf(stdout, "At %.2fs: sender resend seq:%d\n", GetSimulationTime(), next_frame_to_send);
+            inc(next_frame_to_send);
+        }
+        else
+        {
+            break;
+            fprintf(stdout, "At %.2fs: sender window is 0 :%d\n", GetSimulationTime(), next_frame_to_send);
+        }
+    }
 }
 
 // virtual timer api
+void cleartimer()
+{
+    Node *cur = virtual_timer->next;
+    while (cur)
+    {
+        delete (cur);
+        cur = cur->next;
+    }
+    virtual_timer->next = NULL;
+}
 void Sender_StartTimer(double timeout, seq_nr frame_seq)
 {
-    // append a node
-    if (virtual_timer->next == NULL)
+    if (Sender_isTimerSet())
     {
-        //the only node START TIMER NOW
-        virtual_timer->next = new Node(timeout, frame_seq);
-        Sender_StartTimer(timeout);
+        return;
     }
     else
     {
@@ -157,33 +183,60 @@ void Sender_StartTimer(double timeout, seq_nr frame_seq)
         {
             cur = cur->next;
         }
-        cur->next = new Node(GetSimulationTime() + timeout, frame_seq);
-    }
+        double t = GetSimulationTime() + timeout;
+        cur->next = new Node(t, frame_seq);
+        ASSERT(cur->next->next == 0);
 
-  //  fprintf(stdout, "At %.2fs: sender start timer %d\n", GetSimulationTime(), frame_seq);
+        //  fprintf(stdout, "At %.2fs: sender store timer %d %e\n", GetSimulationTime(), frame_seq, t);
+        Sender_StartTimer(0.3);
+    }
 }
 
 void Sender_StopTimer(seq_nr frame_seq)
 {
-    if (virtual_timer->next->next == NULL)
+    if (virtual_timer->next && virtual_timer->next->next == NULL)
     {
-        //the only node STOP TIMER NOW
-        delete (virtual_timer->next);
         Sender_StopTimer();
+        //the only node STOP TIMER NOW
+        virtual_timer->next = NULL;
+        delete (virtual_timer->next);
+
+        //  fprintf(stdout, "At %.2fs: sender stop timer %d\n", GetSimulationTime(), frame_seq);
     }
-    else
+    else if (virtual_timer->next)
     {
         //delete the stopped one
         delete_timeout_node(frame_seq);
-        double timeout = virtual_timer->next->timeout;
-        Sender_StartTimer(GetSimulationTime() - timeout);
+        if (virtual_timer->next)
+        {
+            Sender_StartTimer(0.3);
+        }
+        //  fprintf(stdout, "At %.2fs: sender start timer %d timeout:%e\n", GetSimulationTime(), frame_seq, t);
     }
-  //  fprintf(stdout, "At %.2fs: sender stop timer %d\n", GetSimulationTime(), frame_seq);
 }
-
-void delete_timeout_node(seq_nr frame_seq)
+//debug
+bool in_timeout_node(seq_nr frame_seq)
 {
-    Node *cur = virtual_timer;
+    Node *cur = virtual_timer->next;
+    while (cur && cur->next)
+    {
+        if (cur->next->seq == frame_seq)
+        {
+            return true;
+        }
+        cur = cur->next;
+    }
+    return false;
+}
+bool delete_timeout_node(seq_nr frame_seq)
+{
+    Node *cur = virtual_timer->next;
+    if (cur->seq == frame_seq && cur->next == NULL)
+    {
+        delete (cur);
+        virtual_timer->next = NULL;
+        return true;
+    }
     while (cur && cur->next)
     {
         if (cur->next->seq == frame_seq)
@@ -191,47 +244,33 @@ void delete_timeout_node(seq_nr frame_seq)
             Node *n = cur->next->next;
             delete (cur->next);
             cur->next = n;
+            return true;
         }
         cur = cur->next;
     }
+    fprintf(stdout, "At %.2fs: delete_timeout_node %d cant find\n", GetSimulationTime(), frame_seq);
+    return false;
 }
-seq_nr get_timeout_frame_num()
-{
-    ASSERT(virtual_timer->next);
-    return virtual_timer->next->seq;
-}
-
 // msgbuffer api
 void msgbuffer_push_back(struct message *msg)
 {
-    message *m = (message *)malloc(sizeof(message *));
+    message2 *m = (message2 *)malloc(sizeof(message2));
     char *c = (char *)malloc(sizeof(char) * (msg->size));
     memcpy(c, msg->data, msg->size);
     m->size = msg->size;
     m->data = c;
-    for (int i = 0; i < MSGBUF_SIZE; i++)
-    {
-        if (msgbuffer[i] == 0)
-        {
-            msgbuffer[i] = m;
-            // fprintf(stdout, "At %.2fs: msgbuffer push %d\n", GetSimulationTime(), i);
-            return;
-        }
-    }
-    // debug
-    fprintf(stdout, "At %.2fs: sender MSGBUF is full\n", GetSimulationTime());
-    exit(0);
+    m->c = c;
+    msgbuffer.push(m);
 }
 void msgbuffer_pop_front()
 {
-    free(msgbuffer[0]);
-    for (int i = 0; i < MSGBUF_SIZE - 1; i++)
-    {
-        msgbuffer[i] = msgbuffer[i + 1];
-    }
-    msgbuffer[MSGBUF_SIZE - 1] = 0;
-
-    //  fprintf(stdout, "At %.2fs: sender MSGBUF msgbuffer_pop_front\n", GetSimulationTime());
+    if (msgbuffer.empty())
+        return;
+    if (msgbuffer.front()->c != NULL)
+        free(msgbuffer.front()->c);
+    free(msgbuffer.front());
+    msgbuffer.pop();
+    //    fprintf(stdout, "At %.2fs: sender MSGBUF msgbuffer_pop_front\n", GetSimulationTime());
 }
 
 // window api
@@ -242,6 +281,8 @@ void window_add(frame *frm, seq_nr seq)
 
 void window_delete(seq_nr seq)
 {
+    if (window[seq] == 0)
+        return;
     delete (window[seq]);
     window[seq] = 0;
     // fprintf(stdout, "At %.2fs: sender delete window %d\n", GetSimulationTime(), seq);
@@ -261,29 +302,32 @@ void send_when_window_available()
 {
     while (!window_isfull())
     {
-        message *msg = msgbuffer[0];
-        if (msg == 0) //no msg
-            break;
-        char *d = msg->data;
+        if(msgbuffer.empty())return;
+        message2 *msg = msgbuffer.front(); 
         unsigned int sendsize;
+        char *d;
         if (msg->size <= PAYLOADSIZE)
         {
             sendsize = msg->size;
+            d = (char *)malloc(sendsize);
+            // fprintf(stdout, "sender message size %d\n", msg->size);
+            memcpy(d, msg->data, sendsize);
             msgbuffer_pop_front();
         }
         else
         {
-
-            //    fprintf(stdout, "sender message size %d\n", msg->size);
+            
             sendsize = PAYLOADSIZE;
+            d = (char *)malloc(sendsize);
+            memcpy(d, msg->data, sendsize);
             msg->data += PAYLOADSIZE;
             msg->size -= sendsize;
         }
 
         frame *f = new frame(frame_kind::data, next_frame_to_send, 0, sendsize, d);
         window_add(f, next_frame_to_send);
-        send(f, next_frame_to_send); 
-            inc(next_frame_to_send);
+        send(f, next_frame_to_send);
+        inc(next_frame_to_send);
     }
 }
 
@@ -291,7 +335,8 @@ void send_when_window_available()
 void send(frame *f, seq_nr seq)
 {
     // transform frame to packet
-    packet p = frame_to_packet(f);
+    packet p;
+    p = frame_to_packet(f);
 
     // send it
     Sender_ToLowerLayer(&p);

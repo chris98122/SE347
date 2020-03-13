@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <cstring>
 
 frame packet_to_frame(struct packet *pkt)
 {
@@ -20,23 +21,24 @@ frame packet_to_frame(struct packet *pkt)
 packet frame_to_packet(frame *frm)
 {
     struct packet p;
-    char *d = (char *)malloc(RDT_PKTSIZE);
-    memset(d, 0, RDT_PKTSIZE);
-    d[0] = frm->kind;      //00 = data, 01=ack, 10 = nak 2-bit
-    d[0] += frm->seq << 2; // 000-111 3-bit
-    d[0] += frm->ack << 5; // 000-111 3-bit
-    d[1] = frm->size;
-    memcpy(d + 2, frm->info, frm->size);
-    d[RDT_PKTSIZE - 1] = CRC8Calculate(d, RDT_PKTSIZE - 1);
-    memcpy(p.data, d, RDT_PKTSIZE);
-    free(d);
+    p.data[0] = frm->kind;      //00 = data, 01=ack, 10 = nak 2-bit
+    p.data[0] += frm->seq << 2; // 000-111 3-bit
+    p.data[0] += frm->ack << 5; // 000-111 3-bit
+    p.data[1] = frm->size;
+    // fprintf(stdout, "p.data: %llu \n", p.data);
+
+    // fprintf(stdout, "frm->info: %llu \n", frm->info);
+
+    // fprintf(stdout, "frm->size: %llu \n", frm->size);
+    memcpy(p.data + 2, frm->info, frm->size);
+    p.data[RDT_PKTSIZE - 1] = CRC8Calculate(p.data, RDT_PKTSIZE - 1);
     return p;
 }
 
-bool between(seq_nr a, seq_nr b, seq_nr c)
+bool between(seq_nr a, seq_nr b, seq_nr c) // a is never equal to c
 {
     //return true if a<=b<c circularly ,else return false
-     return (((a <= b) && (b < c)) || ((c < a) && (a <= b)) || ((b < c) && (c < a)) || ((a == b) && (b==c)));
+    return (((a <= b) && (b <= c) && (a != c)) || ((c < a) && (a <= b)) || ((b <= c) && (c < a)) || (a==b && b==c));
 }
 
 bool checksum(struct packet *pkt)
