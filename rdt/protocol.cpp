@@ -11,8 +11,15 @@ frame packet_to_frame(struct packet *pkt)
     frame f;
     char *d = pkt->data;
     f.kind = frame_kind(d[0] & 0b11);
-    f.seq = (d[0] & 0b11100) >> 2;
-    f.ack = (d[0] & 0b11100000) >> 5;
+    if (f.kind == frame_kind::data)
+    {
+        f.seq = (d[0] & 0b11111100) >> 2;
+    }
+    else if (f.kind == frame_kind::ack)
+    {
+        f.ack = (d[0] & 0b11111100) >> 2;
+    }
+
     f.size = d[1];
     f.info = d + 2;
     return f;
@@ -21,24 +28,29 @@ frame packet_to_frame(struct packet *pkt)
 packet frame_to_packet(frame *frm)
 {
     struct packet p;
-    p.data[0] = frm->kind;      //00 = data, 01=ack, 10 = nak 2-bit
-    p.data[0] += frm->seq << 2; // 000-111 3-bit
-    p.data[0] += frm->ack << 5; // 000-111 3-bit
+    p.data[0] = frm->kind; //00 = data, 01=ack, 10 = nak 2-bit
+    if (frm->kind == frame_kind::data)
+    {
+        p.data[0] += frm->seq << 2; // 6-bit available
+    }
+    else if (frm->kind == frame_kind::ack)
+    {
+        p.data[0] += frm->ack << 2; // 6-bit available
+    }
     p.data[1] = frm->size;
-    // fprintf(stdout, "p.data: %llu \n", p.data);
 
-    // fprintf(stdout, "frm->info: %llu \n", frm->info);
-
-    // fprintf(stdout, "frm->size: %llu \n", frm->size);
     memcpy(p.data + 2, frm->info, frm->size);
     p.data[RDT_PKTSIZE - 1] = CRC8Calculate(p.data, RDT_PKTSIZE - 1);
     return p;
+    // fprintf(stdout, "p.data: %llu \n", p.data);
+    // fprintf(stdout, "frm->info: %llu \n", frm->info);
+    // fprintf(stdout, "frm->size: %llu \n", frm->size);
 }
 
 bool between(seq_nr a, seq_nr b, seq_nr c) // a is never equal to c
 {
     //return true if a<=b<c circularly ,else return false
-     return (((a <= b) && (b < c)) || ((c < a) && (a <= b)) || ((b < c) && (c < a)) || ((a == b) && (b==c)));
+    return (((a <= b) && (b < c)) || ((c < a) && (a <= b)) || ((b < c) && (c < a)));
 }
 
 bool checksum(struct packet *pkt)

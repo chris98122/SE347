@@ -59,3 +59,9 @@ STL的unordered_map实现
 ## Performance
 
 ###### overhead
+
+## Protocol的参数设置
+
+1. 实现重传机制的过程中发现，在乱序发送的情况下，receiver可能收到过期的却序列号一致的包而产生错误。
+
+   所以我一开始选择的MAX_SEQ等于7是不够的。由于目前的协议不需要支持piggyback ack
