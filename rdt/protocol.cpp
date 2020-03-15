@@ -10,7 +10,8 @@ frame packet_to_frame(struct packet *pkt)
 {
     frame f;
     char *d = pkt->data;
-    f.kind = frame_kind(d[0] & 0b11);
+    f.kind = frame_kind(d[0] & 0b1);
+    f.isend = (d[0] & 0b10) >> 1;
     if (f.kind == frame_kind::data)
     {
         f.seq = (d[0] & 0b11111100) >> 2;
@@ -28,7 +29,8 @@ frame packet_to_frame(struct packet *pkt)
 packet frame_to_packet(frame *frm)
 {
     struct packet p;
-    p.data[0] = frm->kind; //00 = data, 01=ack, 10 = nak 2-bit
+    p.data[0] = frm->kind; //0 = data, 1=ack,
+    p.data[0] += (frm->isend) << 1;
     if (frm->kind == frame_kind::data)
     {
         p.data[0] += frm->seq << 2; // 6-bit available

@@ -29,9 +29,10 @@ struct frame
     seq_nr ack;      /* acknowledgement number */
     char size;
     char *info; /* the network layer packet */
+    bool isend;
     frame() {}
 
-    frame(frame_kind _kind, seq_nr _seq, seq_nr _ack, char _size, char *_info) : kind(_kind), seq(_seq), ack(_ack), size(_size), info(_info) {}
+    frame(frame_kind _kind, seq_nr _seq, seq_nr _ack, char _size, char *_info,bool _isend) : kind(_kind), seq(_seq), ack(_ack), size(_size), info(_info),isend(_isend) {}
      
 };
 struct Node
