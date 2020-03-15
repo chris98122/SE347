@@ -60,7 +60,7 @@ bool checksum(struct packet *pkt)
     return CRC8Calculate(pkt->data, RDT_PKTSIZE) == 0;
 }
 
-unsigned char CRC8Calculate(void *pBuf, unsigned pBufSize)
+unsigned char CRC8Calculate(void *pBuf, unsigned int pBufSize)
 {
     unsigned char retCRCValue = 0x00;
     unsigned char *pData;

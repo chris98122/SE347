@@ -19,6 +19,7 @@
 void checkcontent(message *msg);
 void Receiver_send(frame_kind kind, seq_nr seq, seq_nr ack, int size, char *data);
 void send_to_upperlayer();
+
 class ReceiveInfo
 {
 public:
@@ -68,14 +69,17 @@ void Receiver_FromLowerLayer(struct packet *pkt)
     // data type-> Receiver_send() ACK
     if (f.kind == frame_kind::data && f.seq >= 0 && f.seq <= MAX_SEQ && f.size >= 1 && f.size <= PAYLOADSIZE)
     {
+        if (f.seq == (last_end + 1) % (MAX_SEQ + 1) || f.seq == (last_end + 2) % (MAX_SEQ + 1))
+        {
+            receive_content[f.seq].data = std::string(f.info, f.size);
+            receive_content[f.seq].received = true;
+            receive_content[f.seq].is_end = f.isend;
+            fprintf(stdout, "At %.2fs: receiver get  seq:%d,size:%d ,start with %c,end with :%c \n", GetSimulationTime(), f.seq, f.size, f.info[0], f.info[f.size - 1]);
 
-        receive_content[f.seq].received = true;
-        receive_content[f.seq].is_end = f.isend;
-        receive_content[f.seq].data = std::string(f.info, f.size);
-        fprintf(stdout, "At %.2fs: receiver get  seq:%d,size:%d ,start with %c \n", GetSimulationTime(), f.seq, f.size, f.info[0]);
-
-        send_to_upperlayer();
-        Receiver_send(frame_kind::ack, 0, f.seq, 0, NULL);
+            send_to_upperlayer();
+        }
+        
+            Receiver_send(frame_kind::ack, 0, f.seq, 0, NULL);
     }
 
     //  fprintf(stdout, "At %.2fs: receiver expect frame_expected %d   \n", GetSimulationTime(), frame_expected);
@@ -83,7 +87,8 @@ void Receiver_FromLowerLayer(struct packet *pkt)
 void send_to_upperlayer()
 {
     seq_nr i = (last_end + 1) % (MAX_SEQ + 1);
-    int cnt = 0;
+    int cnt = 1;
+    double currenttime = GetSimulationTime();
     while (cnt++ != MAX_SEQ + 1)
     {
         if (!receive_content[i].received)
@@ -96,6 +101,8 @@ void send_to_upperlayer()
             message msg;
             std::string s;
             seq_nr j = (last_end + 1) % (MAX_SEQ + 1);
+            fprintf(stdout, "At %.2fs: receiver  seq start with %d,seq end with :%d \n", GetSimulationTime(), j, i);
+            fprintf(stdout, "At %.2fs: receiver  seq %d received %d\n", GetSimulationTime(), j, receive_content[j].received);
             while (j != i)
             {
                 receive_content[j].received = false;
@@ -142,7 +149,7 @@ void checkcontent(message *msg)
         /* message verification */
         if (msg->data[i] != '0' + cnt)
         {
-            fprintf(stdout, "At %.2fs: receiver content err  \n", GetSimulationTime());
+            fprintf(stdout, "At %.2fs: receiver content err ,index:%d ,message size %d ,should be %d,err:%c\n", GetSimulationTime(), i, msg->size, cnt, msg->data[i]);
             exit(0);
         }
         cnt = (cnt + 1) % 10;

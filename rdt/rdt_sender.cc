@@ -26,8 +26,7 @@ void msgbuffer_push_back(struct message *msg);
 void msgbuffer_pop_front();
 void send_when_window_available();
 void window_delete(seq_nr seq);
-bool delete_timeout_node(seq_nr frame_seq);
-bool window_isfull();
+bool delete_timeout_node(seq_nr frame_seq); 
 bool window_is_empty();
 
 /* sender initialization, called once at the very beginning */
@@ -82,7 +81,7 @@ void Sender_FromLowerLayer(struct packet *pkt)
     if (f.kind == frame_kind::ack && f.ack >= 0 && f.ack <= MAX_SEQ)
     {
         //ack n implies n-1 n-2 etc
-        fprintf(stdout, "At %.2fs: sender get ack %d  \n", GetSimulationTime(), f.ack);
+        // fprintf(stdout, "At %.2fs: sender get ack %d  \n", GetSimulationTime(), f.ack);
         window_delete(f.ack);
     }
 
@@ -93,16 +92,16 @@ void Sender_FromLowerLayer(struct packet *pkt)
 /* event handler, called when the timer expires */
 void Sender_Timeout()
 {
-    fprintf(stdout, "At %.2fs: Sender_Timeout \n", GetSimulationTime());
+    // fprintf(stdout, "At %.2fs: Sender_Timeout \n", GetSimulationTime());
     double currenttime = GetSimulationTime();
     for (int i = 0; i < MAX_SEQ + 1; i++)
     {
         if (window[i] != 0 && currenttime - sendtime[i] >= TIMEOUT)
         {
-            fprintf(stdout, "At %.2fs: sender resend seq:%d\n", GetSimulationTime(), i);
+            // fprintf(stdout, "At %.2fs: sender resend seq:%d\n", GetSimulationTime(), i);
             send(window[i], i);
         }
-        else if(!window_is_empty())
+        else if (!window_is_empty())
         {
             Sender_StartTimer(timer_interval);
         }
@@ -146,16 +145,7 @@ void window_delete(seq_nr seq)
     window[seq] = 0;
     // fprintf(stdout, "At %.2fs: sender delete window %d\n", GetSimulationTime(), seq);
 }
-
-bool window_isfull()
-{
-    for (int i = 0; i < MAX_SEQ + 1; i++)
-    {
-        if (window[i] == 0)
-            return false;
-    }
-    return true;
-}
+ 
 bool window_is_empty()
 {
     for (int i = 0; i < MAX_SEQ + 1; i++)
@@ -223,7 +213,7 @@ void send(frame *f, seq_nr seq)
     else
         Sender_StartTimer(TIMEOUT);
 
-    fprintf(stdout, "At %.2fs: sender content  seq:%d,size:%d,start with %c \n", GetSimulationTime(), seq, f->size, f->info[0]);
+    // fprintf(stdout, "At %.2fs: sender content  seq:%d,size:%d,start with %c,end with :%c \n", GetSimulationTime(), seq, f->size, f->info[0], f->info[f->size - 1]);
 
     // fprintf(stdout, "At %.2fs: sender send seq:%d \n", GetSimulationTime(), f->seq);
 }
