@@ -64,28 +64,18 @@ void Receiver_FromLowerLayer(struct packet *pkt)
 
     // transform packet to frame
     frame f = packet_to_frame(pkt);
-    bool somethingwrong = false;
 
     // data type-> Receiver_send() ACK
-    if (f.kind == frame_kind::data)
+    if (f.kind == frame_kind::data && f.seq >= 0 && f.seq <= MAX_SEQ && f.size >= 1 && f.size <= PAYLOADSIZE)
     {
 
-        try
-        {
-            receive_content[f.seq].received = true;
-            receive_content[f.seq].is_end = f.isend;
-            receive_content[f.seq].data = std::string(f.info, f.size);
-            fprintf(stdout, "At %.2fs: receiver get  seq:%d,size:%d ,start with %c \n", GetSimulationTime(), f.seq, f.size, f.info[0]);
+        receive_content[f.seq].received = true;
+        receive_content[f.seq].is_end = f.isend;
+        receive_content[f.seq].data = std::string(f.info, f.size);
+        fprintf(stdout, "At %.2fs: receiver get  seq:%d,size:%d ,start with %c \n", GetSimulationTime(), f.seq, f.size, f.info[0]);
 
-            send_to_upperlayer();
-        }
-        catch (std::exception &e)
-        {
-            somethingwrong = true;
-            fprintf(stdout, "At %.2fs: receiver checksum doesn't work \n", GetSimulationTime());
-        }
-        if (!somethingwrong)
-            Receiver_send(frame_kind::ack, 0, f.seq, 0, NULL);
+        send_to_upperlayer();
+        Receiver_send(frame_kind::ack, 0, f.seq, 0, NULL);
     }
 
     //  fprintf(stdout, "At %.2fs: receiver expect frame_expected %d   \n", GetSimulationTime(), frame_expected);

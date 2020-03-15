@@ -1,5 +1,5 @@
 
-//  go back n
+//  SELECTIVE RESEND
 
 #ifndef _PROTOCOL_H_
 #define _PROTOCOL_H_
@@ -11,6 +11,7 @@
 #define MAX_SEQ 7
 #define OVERHEAD 3
 #define TIMEOUT 0.3
+#define timer_interval 0.1
 
 #define PAYLOADSIZE RDT_PKTSIZE - OVERHEAD
 
