@@ -19,9 +19,8 @@ seq_nr ack_expected;
 frame *window[MAX_SEQ + 1];
 std::queue<message2 *> msgbuffer;
 
-Node *virtual_timer;
-bool windowfull = false;
-bool ack_add = false;
+double sendtime[MAX_SEQ + 1];
+
 void send(frame *f, seq_nr seq);
 void msgbuffer_push_back(struct message *msg);
 void msgbuffer_pop_front();
@@ -29,13 +28,7 @@ void send_when_window_available();
 void window_delete(seq_nr seq);
 bool delete_timeout_node(seq_nr frame_seq);
 bool window_isfull();
-bool window_is_empty();
-// timer api
-void print_timer();
-bool in_timeout_node(seq_nr frame_seq);
-void cleartimer();
-void Sender_StopTimer(seq_nr frame_seq);
-void Sender_StartTimer(double timeout, seq_nr frame_seq);
+bool window_is_empty(); 
 
 /* sender initialization, called once at the very beginning */
 void Sender_Init()
@@ -48,8 +41,6 @@ void Sender_Init()
     // initialize sender buffer
     memset(window, 0, sizeof(frame *) * (MAX_SEQ + 1));
 
-    // initialize a virtual timer ,a dummy node
-    virtual_timer = new Node(0, 0);
 
     // initialize additional buffer
     msgbuffer = std::queue<message2 *>();
@@ -103,10 +94,7 @@ void Sender_FromLowerLayer(struct packet *pkt)
 /* event handler, called when the timer expires */
 void Sender_Timeout()
 {
-    // fprintf(stdout, "At %.2fs: Sender_Timeout \n", GetSimulationTime());
-    // Sender_StopTimer();
-    // cleartimer();
-
+    // fprintf(stdout, "At %.2fs: Sender_Timeout \n", GetSimulationTime()); 
     // for (int i = 0; i < MAX_SEQ + 1; i++)
     // {
     //     if (window[i] != 0)
@@ -116,111 +104,7 @@ void Sender_Timeout()
     //     }
     // }
 }
-
-// virtual timer api
-void cleartimer()
-{
-    // fprintf(stdout, "cleartimer\n");
-    Node *cur = virtual_timer->next;
-    while (cur)
-    {
-        delete (cur);
-        cur = cur->next;
-    }
-    virtual_timer->next = NULL;
-}
-void Sender_StartTimer(double timeout, seq_nr frame_seq)
-{
-
-    Node *cur = virtual_timer;
-    while (cur->next)
-    {
-        cur = cur->next;
-    }
-    cur->next = new Node(GetSimulationTime(), frame_seq);
-
-    ASSERT(cur->next->next == 0);
-
-    if (!Sender_isTimerSet())
-        Sender_StartTimer(TIMEOUT);
-
-    // print_timer();
-}
-
-void Sender_StopTimer(seq_nr frame_seq)
-{
-    // fprintf(stdout, "At %.2fs: sender stop timer %d\n", GetSimulationTime(), frame_seq);
-    if (virtual_timer->next && virtual_timer->next->seq == frame_seq && virtual_timer->next->next == NULL)
-    {
-        Sender_StopTimer();
-        //the only node STOP TIMER NOW
-        delete (virtual_timer->next);
-        virtual_timer->next = NULL;
-    }
-    else if (virtual_timer->next)
-    {
-        //delete the stopped one
-        Sender_StopTimer();
-        delete_timeout_node(frame_seq);
-        if (virtual_timer->next && window[virtual_timer->next->seq] != 0)
-        {
-            double t = virtual_timer->next->timeout + TIMEOUT - GetSimulationTime();
-            if (t > 0.0)
-            {
-                Sender_StartTimer(t);
-            }
-            else
-            {
-                // fprintf(stdout, "At %.2fs: sender Sender_StopTimer %d timeout: %lf\n", GetSimulationTime(), virtual_timer->next->seq, t);
-                Sender_Timeout();
-            }
-        }
-    }
-}
-//debug
-bool in_timeout_node(seq_nr frame_seq)
-{
-    Node *cur = virtual_timer->next;
-    while (cur && cur->next)
-    {
-        if (cur->next->seq == frame_seq)
-        {
-            return true;
-        }
-        cur = cur->next;
-    }
-    return false;
-}
-void print_timer()
-{
-    Node *cur = virtual_timer->next;
-    while (cur)
-    {
-
-        fprintf(stdout, " seq:%d timeout: %lf ", GetSimulationTime(), cur->seq, cur->timeout);
-        cur = cur->next;
-    }
-    fprintf(stdout, "\n");
-}
-bool delete_timeout_node(seq_nr frame_seq)
-{
-    Node *cur = virtual_timer;
-    while (cur && cur->next)
-    {
-        if (cur->next->seq == frame_seq)
-        {
-            Node *n = cur->next->next;
-            delete (cur->next);
-            cur->next = n;
-            // print_timer();
-            return true;
-        }
-        cur = cur->next;
-    }
-    // fprintf(stdout, "At %.2fs: delete_timeout_node %d cant find\n", GetSimulationTime(), frame_seq);
-    // print_timer();
-    return false;
-}
+ 
 // msgbuffer api
 void msgbuffer_push_back(struct message *msg)
 {
@@ -328,7 +212,8 @@ void send(frame *f, seq_nr seq)
     // send it
     Sender_ToLowerLayer(&p);
 
-    Sender_StartTimer(TIMEOUT, seq);
+    sendtime[seq] = GetSimulationTime();
+    Sender_StartTimer(TIMEOUT);
     fprintf(stdout, "At %.2fs: sender content  seq:%d,size:%d,start with %c \n", GetSimulationTime(), seq, f->size, f->info[0]);
 
     // fprintf(stdout, "At %.2fs: sender send seq:%d \n", GetSimulationTime(), f->seq);

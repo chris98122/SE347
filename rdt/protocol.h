@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <malloc.h>
 
-#define MAX_SEQ 20
+#define MAX_SEQ 7
 #define OVERHEAD 3
 #define TIMEOUT 0.3
 
