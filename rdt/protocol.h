@@ -9,9 +9,12 @@
 #include <malloc.h>
 
 #define MAX_SEQ 7
-#define OVERHEAD 3
+#define OVERHEAD 6
+
+#define HEADERSIZE 2
 #define TIMEOUT 0.3
 #define timer_interval 0.1
+#define RDT_CHECKSUM_SIZE 4
 
 #define PAYLOADSIZE RDT_PKTSIZE - OVERHEAD
 
@@ -59,7 +62,7 @@ frame packet_to_frame(struct packet *pkt);
 packet frame_to_packet(frame *frm);
 bool between(seq_nr a, seq_nr b, seq_nr c);
 bool checksum(struct packet *pkt);
-unsigned char CRC8Calculate(void *pBuf, unsigned pBufSize);
 void inc(seq_nr &n);
+static unsigned int crc32(const char *buf, int size);
 
 #endif

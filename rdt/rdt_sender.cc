@@ -28,6 +28,7 @@ void send_when_window_available();
 void window_delete(seq_nr seq);
 bool delete_timeout_node(seq_nr frame_seq); 
 bool window_is_empty();
+void window_add(frame *frm, seq_nr seq);
 
 /* sender initialization, called once at the very beginning */
 void Sender_Init()
@@ -208,9 +209,7 @@ void send(frame *f, seq_nr seq)
 
     sendtime[seq] = GetSimulationTime();
 
-    if (Sender_isTimerSet())
-        Sender_StartTimer(timer_interval);
-    else
+    if (!Sender_isTimerSet())
         Sender_StartTimer(TIMEOUT);
 
     // fprintf(stdout, "At %.2fs: sender content  seq:%d,size:%d,start with %c,end with :%c \n", GetSimulationTime(), seq, f->size, f->info[0], f->info[f->size - 1]);
