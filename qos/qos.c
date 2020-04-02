@@ -32,13 +32,13 @@
  * static inline uint64_t rte_get_tsc_cycles(void)
  * @return: The time base for this lcore.
  */
-unsigned flowweight[APP_FLOWS_MAX] = {8, 4, 2, 1};
+
 //cir = bit/s  cbs-> bits
 struct rte_meter_srtcm_params app_srtcm_params[] = {
-    {.cir = (int)(1.28 * (1000 ^ 3) * 8 / 15), .cbs = 2048 * 8, .ebs = 2048 * 8},
-    {.cir = (int)((1.28 * (1000 ^ 3)) * 4 / 15), .cbs = 2048 * 4, .ebs = 2048 * 4},
-    {.cir = (int)((1.28 * (1000 ^ 3)) * 2 / 15), .cbs = 2048 * 2, .ebs = 2048 * 2},
-    {.cir = (int)((1.28 * (1000 ^ 3)) / 15), .cbs = 2048 * 1, .ebs = 2048 * 1},
+    {.cir = (int)(1.28 * (1000 ^ 3)), .cbs = 2048 * 8, .ebs = 2048 * 8},
+    {.cir = (int)((1.28 * (1000 ^ 3)) / 2), .cbs = 2048 * 4, .ebs = 2048 * 4},
+    {.cir = (int)((1.28 * (1000 ^ 3)) / 4), .cbs = 2048 * 2, .ebs = 2048 * 2},
+    {.cir = (int)((1.28 * (1000 ^ 3)) / 8), .cbs = 2048 * 1, .ebs = 2048 * 1},
 };
 
 FLOW_METER app_flows[APP_FLOWS_MAX];
@@ -82,7 +82,8 @@ enum qos_color
 qos_meter_run(uint32_t flow_id, uint32_t pkt_len, uint64_t time)
 {
     uint8_t output_color;
-    uint64_t cputime = time * 1.28 * 1000 * 1000 * 1000; //1.28 Gbps //convert ns to cpu circles
+    uint64_t cpu_hz = rte_get_tsc_hz();
+    uint64_t cputime = time * cpu_hz / (10 ^ 9); //convert ns to cpu circles
     output_color = (uint8_t)rte_meter_srtcm_color_blind_check(&app_flows[flow_id], cputime, pkt_len);
 
     /* Apply policing and set the output color */
@@ -103,9 +104,7 @@ qos_meter_run(uint32_t flow_id, uint32_t pkt_len, uint64_t time)
  */
 struct rte_red *red;
 struct rte_red_config *red_cfg_red[APP_FLOWS_MAX];
-
 struct rte_red_config *red_cfg_yellow[APP_FLOWS_MAX];
-
 struct rte_red_config *red_cfg_green[APP_FLOWS_MAX];
 
 int qos_dropper_init(void)
@@ -129,6 +128,8 @@ int qos_dropper_init(void)
     const uint16_t maxp_inv_green = 10; //inverse mark probability value
 
     //  8:4:2:1, that is flow 0 has highest quality of service and its allocated bandwidth is 8 times of flow 3.
+
+    double flowweight[APP_FLOWS_MAX] = {40, 1.5, 0.8, 0.2};
 
     rte_red_rt_data_init(red);
     for (int i = 0; i < APP_FLOWS_MAX; i++)
@@ -162,30 +163,31 @@ int qos_dropper_init(void)
  * @retval 1 drop the packet based on max threshold criteria
  * @retval 2 drop the packet based on mark probability criteria
  */
-unsigned q; //the current size of the packet queue (in packets)
+unsigned queues[APP_FLOWS_MAX]; //the current size of the packet queue (in packets)
 
 int qos_dropper_run(uint32_t flow_id, enum qos_color color, uint64_t time)
 {
     int retval;
     // the queues will be cleared (meaning all packets in the queues will be sent out)
     // at end of the time period (1000 ns
-
-    uint64_t cputime = time * 1.28 * 1000 * 1000 * 1000;
+    uint64_t cpu_hz = rte_get_tsc_hz();
+    uint64_t cputime = time * cpu_hz / (10 ^ 9);
 
     if (time - red->q_time > 1000)
     {
         rte_red_mark_queue_empty(red, time);
-        q = 0;
+        for (int i = 0; i < APP_FLOWS_MAX; i++)
+            queues[i] = 0;
     }
 
     if (color == RED)
-        retval = rte_red_enqueue(red_cfg_red[flow_id], red, q, cputime);
+        retval = rte_red_enqueue(red_cfg_red[flow_id], red, queues[flow_id], cputime);
     if (color == GREEN)
-        retval = rte_red_enqueue(red_cfg_green[flow_id], red, q, cputime);
+        retval = rte_red_enqueue(red_cfg_green[flow_id], red, queues[flow_id], cputime);
     if (color == YELLOW)
-        retval = rte_red_enqueue(red_cfg_yellow[flow_id], red, q, cputime);
+        retval = rte_red_enqueue(red_cfg_yellow[flow_id], red, queues[flow_id], cputime);
 
-    q++;
+    queues[flow_id]++;
 
     return retval;
 }
