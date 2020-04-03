@@ -37,10 +37,10 @@
 /**< Committed Burst Size (CBS).  Measured in bytes. */
 /**< Excess Burst Size (EBS).  Measured in bytes. */
 struct rte_meter_srtcm_params app_srtcm_params[] = {
-    {.cir = (int)(0.16 * (1000 ^ 3)), .cbs = 10000 * 40, .ebs = 10000 * 40},
-    {.cir = (int)((0.16 * (1000 ^ 3)) / 2), .cbs = 2048 * 4, .ebs = 2048 * 4},
-    {.cir = (int)((0.16 * (1000 ^ 3)) / 4), .cbs = 2048 * 2, .ebs = 2048 * 2},
-    {.cir = (int)((0.16 * (1000 ^ 3)) / 8), .cbs = 2048 * 1, .ebs = 2048 * 1},
+    {.cir = (int)(0.16 * (1000 ^ 3)), .cbs = 1000 * 640, .ebs = 1000 * 640},                         // Flow 0
+    {.cir = (int)((0.16 * (1000 ^ 3)) / 2), .cbs = 1000 * 640 / 4 / 4, .ebs = 1000 * 640 / 4 / 4},   // Flow 1
+    {.cir = (int)((0.16 * (1000 ^ 3)) / 4), .cbs = 1000 * 640 / 4 / 15, .ebs = 1000 * 640 / 4 / 15}, // Flow 2
+    {.cir = (int)((0.16 * (1000 ^ 3)) / 8), .cbs = 1000 * 640 / 4 / 45, .ebs = 1000 * 640 / 4 / 45}, // Flow 3
 };
 
 FLOW_METER app_flows[APP_FLOWS_MAX];
@@ -104,20 +104,20 @@ static struct rte_red_params app_red_params[APP_FLOWS_MAX][e_RTE_METER_COLORS] =
     {
         // Flow 1
         {.min_th = 64, .max_th = 1023, .maxp_inv = 10, .wq_log2 = 9}, // Green
-        {.min_th = 16, .max_th = 32, .maxp_inv = 3, .wq_log2 = 9},    // Yellow
-        {.min_th = 1, .max_th = 16, .maxp_inv = 1, .wq_log2 = 9}      // Red
+        {.min_th = 12, .max_th = 28, .maxp_inv = 3, .wq_log2 = 9},    // Yellow
+        {.min_th = 1, .max_th = 12, .maxp_inv = 1, .wq_log2 = 9}      // Red
     },
     {
         // Flow 2
         {.min_th = 64, .max_th = 1023, .maxp_inv = 10, .wq_log2 = 9}, // Green
-        {.min_th = 4, .max_th = 16, .maxp_inv = 2, .wq_log2 = 9},     // Yellow
-        {.min_th = 1, .max_th = 8, .maxp_inv = 1, .wq_log2 = 9}       // Red
+        {.min_th = 3, .max_th = 12, .maxp_inv = 2, .wq_log2 = 9},     // Yellow
+        {.min_th = 1, .max_th = 6, .maxp_inv = 1, .wq_log2 = 9}       // Red
     },
     {
         // Flow 3
         {.min_th = 64, .max_th = 1023, .maxp_inv = 10, .wq_log2 = 9}, // Green
-        {.min_th = 2, .max_th = 6, .maxp_inv = 3, .wq_log2 = 9},      // Yellow
-        {.min_th = 1, .max_th = 3, .maxp_inv = 1, .wq_log2 = 9}       // Red
+        {.min_th = 1, .max_th = 5, .maxp_inv = 2, .wq_log2 = 9},      // Yellow
+        {.min_th = 0, .max_th = 2, .maxp_inv = 1, .wq_log2 = 9}       // Red
     }};
 /**
  * This function will be called only once at the beginning of the test. 
@@ -137,7 +137,7 @@ struct rte_red_config *red_cfg_green[APP_FLOWS_MAX];
 
 int qos_dropper_init(void)
 {
-  
+
     for (int i = 0; i < APP_FLOWS_MAX; i++)
     {
         red[i] = (struct rte_red *)malloc(sizeof(struct rte_red));
