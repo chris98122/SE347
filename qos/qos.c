@@ -33,15 +33,18 @@
  * @return: The time base for this lcore.
  */
 
-//cir = bit/s  cbs-> bits
+/**< Committed Information Rate (CIR). Measured in bytes per second. */
+/**< Committed Burst Size (CBS).  Measured in bytes. */
+/**< Excess Burst Size (EBS).  Measured in bytes. */
 struct rte_meter_srtcm_params app_srtcm_params[] = {
-    {.cir = (int)(1.28 * (1000 ^ 3)), .cbs = 2048 * 8, .ebs = 2048 * 8},
-    {.cir = (int)((1.28 * (1000 ^ 3)) / 2), .cbs = 2048 * 4, .ebs = 2048 * 4},
-    {.cir = (int)((1.28 * (1000 ^ 3)) / 4), .cbs = 2048 * 2, .ebs = 2048 * 2},
-    {.cir = (int)((1.28 * (1000 ^ 3)) / 8), .cbs = 2048 * 1, .ebs = 2048 * 1},
+    {.cir = (int)(0.16 * (1000 ^ 3)), .cbs = 10000 * 40, .ebs = 10000 * 40},
+    {.cir = (int)((0.16 * (1000 ^ 3)) / 2), .cbs = 2048 * 4, .ebs = 2048 * 4},
+    {.cir = (int)((0.16 * (1000 ^ 3)) / 4), .cbs = 2048 * 2, .ebs = 2048 * 2},
+    {.cir = (int)((0.16 * (1000 ^ 3)) / 8), .cbs = 2048 * 1, .ebs = 2048 * 1},
 };
 
 FLOW_METER app_flows[APP_FLOWS_MAX];
+
 int qos_meter_init(void)
 {
 
@@ -91,6 +94,31 @@ qos_meter_run(uint32_t flow_id, uint32_t pkt_len, uint64_t time)
     return output_color;
 }
 
+static struct rte_red_params app_red_params[APP_FLOWS_MAX][e_RTE_METER_COLORS] = {
+    {
+        // Flow 0
+        {.min_th = 1022, .max_th = 1023, .maxp_inv = 255, .wq_log2 = 9}, // Green
+        {.min_th = 16, .max_th = 32, .maxp_inv = 5, .wq_log2 = 9},       // Yellow
+        {.min_th = 1, .max_th = 16, .maxp_inv = 1, .wq_log2 = 9}         // Red
+    },
+    {
+        // Flow 1
+        {.min_th = 64, .max_th = 1023, .maxp_inv = 10, .wq_log2 = 9}, // Green
+        {.min_th = 16, .max_th = 32, .maxp_inv = 3, .wq_log2 = 9},    // Yellow
+        {.min_th = 1, .max_th = 16, .maxp_inv = 1, .wq_log2 = 9}      // Red
+    },
+    {
+        // Flow 2
+        {.min_th = 64, .max_th = 1023, .maxp_inv = 10, .wq_log2 = 9}, // Green
+        {.min_th = 4, .max_th = 16, .maxp_inv = 2, .wq_log2 = 9},     // Yellow
+        {.min_th = 1, .max_th = 8, .maxp_inv = 1, .wq_log2 = 9}       // Red
+    },
+    {
+        // Flow 3
+        {.min_th = 64, .max_th = 1023, .maxp_inv = 10, .wq_log2 = 9}, // Green
+        {.min_th = 2, .max_th = 6, .maxp_inv = 3, .wq_log2 = 9},      // Yellow
+        {.min_th = 1, .max_th = 3, .maxp_inv = 1, .wq_log2 = 9}       // Red
+    }};
 /**
  * This function will be called only once at the beginning of the test. 
  * You can initialize you dropper here
@@ -102,44 +130,40 @@ qos_meter_run(uint32_t flow_id, uint32_t pkt_len, uint64_t time)
    const uint16_t min_th, const uint16_t max_th, const uint16_t maxp_inv);
  * @return Operation status, 0 success 
  */
-struct rte_red *red;
+struct rte_red *red[APP_FLOWS_MAX];
 struct rte_red_config *red_cfg_red[APP_FLOWS_MAX];
 struct rte_red_config *red_cfg_yellow[APP_FLOWS_MAX];
 struct rte_red_config *red_cfg_green[APP_FLOWS_MAX];
 
 int qos_dropper_init(void)
 {
-
-    red = (struct rte_red *)malloc(sizeof(struct rte_red));
-
-    const uint16_t wq_log2_red = 9; // inverse filter weight value
-    const uint16_t min_th_red = 16; //threshold limit
-    const uint16_t max_th_red = 32;
-    const uint16_t maxp_inv_red = 10; //inverse mark probability value
-
-    const uint16_t wq_log2_yellow = 9; // inverse filter weight value
-    const uint16_t min_th_yellow = 22; // threshold limit
-    const uint16_t max_th_yellow = 32;
-    const uint16_t maxp_inv_yellow = 10; //inverse mark probability value
-
-    const uint16_t wq_log2_green = 9; // inverse filter weight value
-    const uint16_t min_th_green = 28; //threshold limit
-    const uint16_t max_th_green = 32;
-    const uint16_t maxp_inv_green = 10; //inverse mark probability value
-
-    //  8:4:2:1, that is flow 0 has highest quality of service and its allocated bandwidth is 8 times of flow 3.
-
-    double flowweight[APP_FLOWS_MAX] = {40, 1.5, 0.8, 0.2};
-
-    rte_red_rt_data_init(red);
+  
     for (int i = 0; i < APP_FLOWS_MAX; i++)
     {
+        red[i] = (struct rte_red *)malloc(sizeof(struct rte_red));
+        rte_red_rt_data_init(red[i]);
+
         red_cfg_red[i] = (struct rte_red_config *)malloc(sizeof(struct rte_red_config));
         red_cfg_yellow[i] = (struct rte_red_config *)malloc(sizeof(struct rte_red_config));
         red_cfg_green[i] = (struct rte_red_config *)malloc(sizeof(struct rte_red_config));
-        rte_red_config_init(red_cfg_red[i], wq_log2_red, min_th_red * flowweight[i], max_th_red * flowweight[i], maxp_inv_red);
-        rte_red_config_init(red_cfg_yellow[i], wq_log2_yellow, min_th_yellow * flowweight[i], max_th_yellow * flowweight[i], maxp_inv_yellow);
-        rte_red_config_init(red_cfg_green[i], wq_log2_green, min_th_green * flowweight[i], max_th_green * flowweight[i], maxp_inv_green);
+
+        rte_red_config_init(red_cfg_red[i],
+                            app_red_params[i][2].wq_log2,
+                            app_red_params[i][2].min_th,
+                            app_red_params[i][2].max_th,
+                            app_red_params[i][2].maxp_inv);
+
+        rte_red_config_init(red_cfg_yellow[i],
+                            app_red_params[i][1].wq_log2,
+                            app_red_params[i][1].min_th,
+                            app_red_params[i][1].max_th,
+                            app_red_params[i][1].maxp_inv);
+
+        rte_red_config_init(red_cfg_green[i],
+                            app_red_params[i][0].wq_log2,
+                            app_red_params[i][0].min_th,
+                            app_red_params[i][0].max_th,
+                            app_red_params[i][0].maxp_inv);
     }
 
     return 0;
@@ -173,19 +197,19 @@ int qos_dropper_run(uint32_t flow_id, enum qos_color color, uint64_t time)
     uint64_t cpu_hz = rte_get_tsc_hz();
     uint64_t cputime = time * cpu_hz / (10 ^ 9);
 
-    if (time - red->q_time > 1000)
+    if (time - red[flow_id]->q_time > 1000)
     {
-        rte_red_mark_queue_empty(red, time);
+        rte_red_mark_queue_empty(red[flow_id], time);
         for (int i = 0; i < APP_FLOWS_MAX; i++)
             queues[i] = 0;
     }
 
     if (color == RED)
-        retval = rte_red_enqueue(red_cfg_red[flow_id], red, queues[flow_id], cputime);
+        retval = rte_red_enqueue(red_cfg_red[flow_id], red[flow_id], queues[flow_id], cputime);
     if (color == GREEN)
-        retval = rte_red_enqueue(red_cfg_green[flow_id], red, queues[flow_id], cputime);
+        retval = rte_red_enqueue(red_cfg_green[flow_id], red[flow_id], queues[flow_id], cputime);
     if (color == YELLOW)
-        retval = rte_red_enqueue(red_cfg_yellow[flow_id], red, queues[flow_id], cputime);
+        retval = rte_red_enqueue(red_cfg_yellow[flow_id], red[flow_id], queues[flow_id], cputime);
 
     queues[flow_id]++;
 
