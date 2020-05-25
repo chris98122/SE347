@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="Maven: com.alipay.sofa.common:sofa-common-tools:1.0.18">
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/com/alipay/sofa/common/sofa-common-tools/1.0.18/sofa-common-tools-1.0.18.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="jar://$MAVEN_REPOSITORY$/com/alipay/sofa/common/sofa-common-tools/1.0.18/sofa-common-tools-1.0.18-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$MAVEN_REPOSITORY$/com/alipay/sofa/common/sofa-common-tools/1.0.18/sofa-common-tools-1.0.18-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>
