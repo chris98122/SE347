@@ -7,6 +7,7 @@ import sjtu.sdic.mapreduce.core.Worker;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -18,12 +19,25 @@ public class WordCount {
 
     public static List<KeyValue> mapFunc(String file, String value) {
         // Your code here (Part II)
-       return null;
+        // Split contents to words, return List of common/KeyValue
+        HashMap<String, Integer> wordcount = new HashMap<>();
+        List<KeyValue> res = new ArrayList<>();
+        String[] splitted = value.split(" ");
+
+        System.out.println("splitted:");
+        print(splitted);
+        return res;
     }
 
     public static String reduceFunc(String key, String[] values) {
         // Your code here (Part II)
         return null;
+    }
+
+    public static void print(String[] splitted) {
+        for (String val : splitted) {
+            System.out.println(val);
+        }
     }
 
     public static void main(String[] args) {

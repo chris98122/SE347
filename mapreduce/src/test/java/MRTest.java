@@ -46,7 +46,7 @@ public class MRTest {
         for (String s : values) {
             Utils.debug(String.format("Reduce %s %s", key, s));
         }
-        return "";
+        return key;
     }
 
     public String[] makeInputs(int num) {
