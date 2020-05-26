@@ -13,6 +13,8 @@ import java.util.List;
 
 import java.util.Collections;
 
+import java.util.Comparator;
+
 /**
  * Created by Cachhe on 2019/4/19.
  */
@@ -67,53 +69,58 @@ public class Mapper {
      * @param mapF    the user-defined map function
      */
     public static void doMap(String jobName, int mapTask, String inFile, int nReduce, MapFunc mapF) {
-        System.out.println(jobName);
-        System.out.println(inFile);
+
         String filecontent = readUTF(inFile);
-        // check filecontent
-        // System.out.println(filecontent);
         List<KeyValue> kvpairs_list = mapF.map(inFile, filecontent);
+
         // Sort all the (key, value) data by keys
-        // partition the List<KeyValue>
-          // printListKV(kvpairs_list);
-        // generate  nReduce intermediate file name
-        int reduce_num = 0;
-        String intermediate_file_name = Utils.reduceName(jobName,mapTask,reduce_num);
+        kvpairs_list.sort(new Comparator<KeyValue>() {
+            public int compare(KeyValue o1, KeyValue o2) {
+                return o1.key.compareTo(o2.key);
+            }
+        });
 
-        System.out.println(intermediate_file_name);
-
-        //encoded the key/value pairs
-        String json_kvpairs= JSONArray.toJSONString(kvpairs_list);
-
-        // create intermediate files Intermediate k/v pairs buffered in memory and periodically written to the local disk
-        writeFile(intermediate_file_name,json_kvpairs);
-    }
-    public static void printListKV(List<KeyValue> kvpairs_list)
-    {
-        for(KeyValue pair : kvpairs_list) {
-            System.out.println(pair.key+":"+pair.value);
+        // partition kvpairs_list
+        List<List<KeyValue>> partition = new ArrayList<>();
+        for (int i = 0; i < nReduce; i++) {
+            partition.add(new ArrayList<KeyValue>());
+        }
+        for (int i = 0; i < kvpairs_list.size(); i++) {
+            partition.get(hashCode(kvpairs_list.get(i).key) % nReduce).add(kvpairs_list.get(i));
+        }
+        //generate  nReduce intermediate file name
+        for (int i = 0; i < nReduce; i++) {
+            int reduce_num = i % nReduce;
+            String intermediate_file_name = Utils.reduceName(jobName, mapTask, reduce_num);
+            String json_kvpairs = JSONArray.toJSONString(partition.get(i));
+            // create intermediate files Intermediate k/v pairs buffered in memory and periodically written to the local disk
+            writeFile(intermediate_file_name, json_kvpairs);
+           System.out.println(intermediate_file_name);
         }
     }
-    public static void writeFile(String inFile,String content)
-    {
-        try
-        {
-            BufferedWriter out = new BufferedWriter(new FileWriter( inFile ));
-            out = new BufferedWriter(new FileWriter(inFile,true));
+
+    public static void printListKV(List<KeyValue> kvpairs_list) {
+        for (KeyValue pair : kvpairs_list) {
+            System.out.println(pair.key + ":" + pair.value);
+        }
+    }
+
+    public static void writeFile(String inFile, String content) {
+        try {
+            BufferedWriter out = new BufferedWriter(new FileWriter(inFile));
+            out = new BufferedWriter(new FileWriter(inFile, true));
             out.write(content);
             out.flush();
             out.close();
-        } catch (UnsupportedEncodingException e)
-        {
+        } catch (UnsupportedEncodingException e) {
             System.out.println(e.getMessage());
-        } catch (IOException e)
-        {
+        } catch (IOException e) {
             System.out.println(e.getMessage());
-        } catch (Exception e)
-        {
+        } catch (Exception e) {
             System.out.println(e.getMessage());
         }
     }
+
     public static String readUTF(String inFile) {
         try {
             File fileDir = new File(inFile);

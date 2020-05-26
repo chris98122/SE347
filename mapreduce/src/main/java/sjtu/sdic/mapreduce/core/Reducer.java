@@ -54,24 +54,24 @@ public class Reducer {
      */
     public static void doReduce(String jobName, int reduceTask, String outFile, int nMap, ReduceFunc reduceF) {
         // read the intermediate  files for the task,
-        String inFile = Utils.reduceName(jobName, 0, reduceTask);
-
-
-        String json_kvpairs = readUTF(inFile);
-        // sort the intermediate key/value pairs by key,
-
-        List<KeyValue> kvpairs_list = JSONArray.parseArray(json_kvpairs, KeyValue.class);
-
+        List<KeyValue> kvpairs_list = new ArrayList<KeyValue>();
+        for (int i = 0; i < nMap; i++) {
+            String inFile = Utils.reduceName(jobName, i, reduceTask);
+            System.out.println(inFile);
+            String json_kvpairs = readUTF(inFile);
+            // sort the intermediate key/value pairs by key,
+            kvpairs_list.addAll(JSONArray.parseArray(json_kvpairs, KeyValue.class));
+        }
 
         //  call the user-defined reduce function {@code reduceF} for each key,
-        HashMap<String,String> content = new HashMap<>();
+        HashMap<String, String> content = new HashMap<>();
         for (KeyValue pair : kvpairs_list) {
             String[] strArray = {pair.value};
             //  System.out.println(jsonObject.toString());
-            content.put(pair.key,reduceF.reduce(pair.key,strArray));
-
+            content.put(pair.key, reduceF.reduce(pair.key, strArray));
         }
-        writeFile(outFile,JSONObject.toJSONString(content));
+        
+        writeFile(outFile, JSONObject.toJSONString(content));
 
         // write the reduce output as JSON encoded KeyValue objects to the file named outFile
 
@@ -85,9 +85,9 @@ public class Reducer {
 
     public static void writeFile(String inFile, String content) {
         try {
-            BufferedWriter  out = new BufferedWriter(new FileWriter(inFile,true));
+            BufferedWriter out = new BufferedWriter(new FileWriter(inFile, true));
             out.newLine();
-            out.write( content );
+            out.write(content);
             out.close();
         } catch (UnsupportedEncodingException e) {
             System.out.println(e.getMessage());
