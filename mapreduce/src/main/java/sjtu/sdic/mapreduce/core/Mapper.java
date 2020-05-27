@@ -95,7 +95,7 @@ public class Mapper {
             String json_kvpairs = JSONArray.toJSONString(partition.get(i));
             // create intermediate files Intermediate k/v pairs buffered in memory and periodically written to the local disk
             writeFile(intermediate_file_name, json_kvpairs);
-           System.out.println(intermediate_file_name);
+            System.out.println(intermediate_file_name);
         }
     }
 

@@ -68,9 +68,12 @@ public class Reducer {
         for (KeyValue pair : kvpairs_list) {
             String[] strArray = {pair.value};
             //  System.out.println(jsonObject.toString());
-            content.put(pair.key, reduceF.reduce(pair.key, strArray));
+            if (content.get(pair.key) == null)
+                content.put(pair.key, reduceF.reduce(pair.key, strArray));
+            else
+                content.put(pair.key, String.valueOf(Integer.valueOf(content.get(pair.key)) + Integer.valueOf(reduceF.reduce(pair.key, strArray))));
         }
-        
+
         writeFile(outFile, JSONObject.toJSONString(content));
 
         // write the reduce output as JSON encoded KeyValue objects to the file named outFile
