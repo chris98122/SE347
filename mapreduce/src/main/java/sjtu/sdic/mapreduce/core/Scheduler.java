@@ -25,12 +25,14 @@ public class Scheduler {
      * suitable for passing to {@link Call}. registerChan will yield all
      * existing registered workers (if any) and new ones as they register.
      *
-     * @param jobName job name
-     * @param mapFiles files' name (if in same dir, it's also the files' path)
-     * @param nReduce the number of reduce task that will be run ("R" in the paper)
-     * @param phase MAP or REDUCE
+     * @param jobName      job name
+     * @param mapFiles     files' name (if in same dir, it's also the files' path)
+     * @param nReduce      the number of reduce task that will be run ("R" in the paper)
+     * @param phase        MAP or REDUCE
      * @param registerChan register info channel
      */
+
+
     public static void schedule(String jobName, String[] mapFiles, int nReduce, JobPhase phase, Channel<String> registerChan) {
         int nTasks = -1; // number of map or reduce tasks
         int nOther = -1; // number of inputs (for reduce) or outputs (for map)
@@ -48,13 +50,40 @@ public class Scheduler {
         System.out.println(String.format("Schedule: %d %s tasks (%d I/Os)", nTasks, phase, nOther));
 
         /**
-        // All ntasks tasks have to be scheduled on workers. Once all tasks
-        // have completed successfully, schedule() should return.
-        //
-        // Your code here (Part III, Part IV).
-        //
-        */
+         // All ntasks tasks have to be scheduled on workers. Once all tasks
+         // have completed successfully, schedule() should return.
 
+         */
+        //Hint: schedule() should send RPCs to the workers in parallel so that the workers can work on tasks concurrently. Learn how to use Java Thread API
+        //  Hint: schedule() must wait for a worker to finish before it can give it another task. Try to exploit Channel.
+
+        //To stop a thread, using interrupt().
+        CountDownLatch latch = new CountDownLatch(nTasks);
+        for (int i = 0; i < nTasks; i++) {
+            DoTaskArgs arg = new DoTaskArgs(jobName, mapFiles[i], phase, i, nOther);
+            Thread run = new Thread(() -> {
+                String worker = "";
+                try {
+                    worker = registerChan.read();//return only if there's a value, otherwise blocking
+
+                    Call.getWorkerRpcService(worker).doTask(arg);
+                    if (latch != null) {
+                        latch.countDown();
+                    }
+                    registerChan.write(worker);
+                } catch (Exception e) {
+                    System.out.println(e.getMessage());
+                }
+
+            });
+            run.setDaemon(true);
+            run.start();
+        }
+        try {
+            latch.await();
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
         System.out.println(String.format("Schedule: %s done", phase));
     }
 }
