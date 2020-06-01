@@ -6,6 +6,8 @@ import sjtu.sdic.mapreduce.common.JobPhase;
 import sjtu.sdic.mapreduce.common.Utils;
 import sjtu.sdic.mapreduce.rpc.Call;
 
+import com.alipay.sofa.rpc.core.exception.SofaRpcException;
+import com.alipay.sofa.rpc.core.exception.SofaTimeOutException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -65,16 +67,24 @@ public class Scheduler {
                 String worker = "";
                 try {
                     worker = registerChan.read();//return only if there's a value, otherwise blocking
-
-                    Call.getWorkerRpcService(worker).doTask(arg);
-                    if (latch != null) {
-                        latch.countDown();
+                    System.out.println(String.format("worker: %s read", worker));
+                    boolean trying = true;
+                    while(trying) {
+                        try {
+                            Call.getWorkerRpcService(worker).doTask(arg);
+                            registerChan.write(worker);  // when success put worker back to waiting pool
+                            if (latch != null) {
+                                latch.countDown();
+                            }
+                            trying  = false;
+                        } catch (SofaRpcException e) {
+                            trying  = true;
+                            worker = registerChan.read();
+                        }
                     }
-                    registerChan.write(worker);
-                } catch (Exception e) {
-                    System.out.println(e.getMessage());
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
-
             });
             run.setDaemon(true);
             run.start();
