@@ -2,7 +2,6 @@ package sjtu.sdic.mapreduce.core;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
-import com.alibaba.fastjson.JSONPObject;
 import sjtu.sdic.mapreduce.common.KeyValue;
 import sjtu.sdic.mapreduce.common.Utils;
 
@@ -65,19 +64,23 @@ public class Reducer {
 
         //  call the user-defined reduce function {@code reduceF} for each key,
         HashMap<String, String> content = new HashMap<>();
+        HashMap<String, List<String>> reducer_input = new HashMap<>();
         for (KeyValue pair : kvpairs_list) {
-            String[] strArray = {pair.value};
-            //  System.out.println(jsonObject.toString());
-            if (content.get(pair.key) == null)
-                content.put(pair.key, reduceF.reduce(pair.key, strArray));
-            else
-                content.put(pair.key, String.valueOf(Integer.valueOf(content.get(pair.key)) + Integer.valueOf(reduceF.reduce(pair.key, strArray))));
+            if (reducer_input.get(pair.key) == null) {
+                List<String> list = new ArrayList<String>();
+                reducer_input.put(pair.key, list);
+            } else {
+                List<String> list = reducer_input.get(pair.key);
+                list.add(pair.value);
+                reducer_input.put(pair.key, list);
+            }
         }
-
+        for (String key : reducer_input.keySet()) {
+            List<String> list = reducer_input.get(key);
+            content.put(key, reduceF.reduce(key, list.toArray(new String[list.size()])));
+        }
         writeFile(outFile, JSONObject.toJSONString(content));
-
         // write the reduce output as JSON encoded KeyValue objects to the file named outFile
-
     }
 
     public static void printListKV(List<KeyValue> kvpairs_list) {

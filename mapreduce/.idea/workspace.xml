@@ -16,22 +16,10 @@
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/test/java/MRTest.java">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="4522">
-              <caret line="257" column="16" selection-start-line="257" selection-start-column="16" selection-end-line="257" selection-end-column="16" />
-              <folding>
-                <element signature="imports" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/Scheduler.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="358">
-              <caret line="78" column="44" selection-start-line="78" selection-start-column="44" selection-end-line="78" selection-end-column="44" />
+            <state relative-caret-position="219">
+              <caret line="77" column="29" selection-start-line="77" selection-start-column="29" selection-end-line="77" selection-end-column="29" />
               <folding>
                 <element signature="imports" expanded="true" />
               </folding>
@@ -54,8 +42,32 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/Worker.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="4066">
-              <caret line="235" column="28" selection-start-line="235" selection-start-column="17" selection-end-line="235" selection-end-column="28" />
+            <state relative-caret-position="4041">
+              <caret line="243" column="50" selection-start-line="243" selection-start-column="50" selection-end-line="243" selection-end-column="50" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/Mapper.java">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="82">
+              <caret line="73" column="22" selection-start-line="73" selection-start-column="5" selection-end-line="73" selection-end-column="22" />
+              <folding>
+                <element signature="imports" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/Reducer.java">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="57">
+              <caret line="3" column="39" selection-start-line="3" selection-start-column="39" selection-end-line="3" selection-end-column="39" />
+              <folding>
+                <element signature="e#3169#3177#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -63,8 +75,41 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/Master.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="3192">
+            <state relative-caret-position="874">
               <caret line="193" column="35" selection-start-line="193" selection-start-column="35" selection-end-line="193" selection-end-column="35" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/common/KeyValue.java">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="133">
+              <caret line="7" column="17" selection-start-line="7" selection-start-column="11" selection-end-line="7" selection-end-column="17" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/WordCount.java">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="320">
+              <caret line="29" column="47" selection-start-line="29" selection-start-column="24" selection-end-line="29" selection-end-column="47" />
+              <folding>
+                <element signature="imports" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/MapFunc.java">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="171">
+              <caret line="9" column="24" selection-start-line="9" selection-start-column="17" selection-end-line="9" selection-end-column="24" />
+              <folding>
+                <element signature="imports" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -114,10 +159,10 @@
     <option name="CHANGED_PATHS">
       <list>
         <option value="$PROJECT_DIR$/src/test/java/MRTest.java" />
-        <option value="$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/WordCount.java" />
-        <option value="$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/Reducer.java" />
         <option value="$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/Mapper.java" />
         <option value="$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/Scheduler.java" />
+        <option value="$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/WordCount.java" />
+        <option value="$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/Reducer.java" />
       </list>
     </option>
   </component>
@@ -380,17 +425,11 @@
       <workItem from="1590911708662" duration="3603000" />
       <workItem from="1590933729890" duration="1813000" />
       <workItem from="1590938582948" duration="2823000" />
-      <workItem from="1590995054268" duration="2189000" />
+      <workItem from="1590995054268" duration="8361000" />
     </task>
     <servers />
   </component>
   <component name="TestHistory">
-    <history-entry file="MRTest_testOneFailure - 2020.05.31 at 18h 00m 20s.xml">
-      <configuration name="MRTest.testOneFailure" configurationId="JUnit" />
-    </history-entry>
-    <history-entry file="MRTest_testOneFailure - 2020.05.31 at 18h 01m 44s.xml">
-      <configuration name="MRTest.testOneFailure" configurationId="JUnit" />
-    </history-entry>
     <history-entry file="MRTest_testOneFailure - 2020.05.31 at 18h 03m 40s.xml">
       <configuration name="MRTest.testOneFailure" configurationId="JUnit" />
     </history-entry>
@@ -415,9 +454,15 @@
     <history-entry file="MRTest - 2020.06.01 at 15h 19m 18s.xml">
       <configuration name="MRTest" configurationId="JUnit" />
     </history-entry>
+    <history-entry file="MRTest - 2020.06.01 at 15h 41m 58s.xml">
+      <configuration name="MRTest" configurationId="JUnit" />
+    </history-entry>
+    <history-entry file="MRTest - 2020.06.01 at 17h 38m 10s.xml">
+      <configuration name="MRTest" configurationId="JUnit" />
+    </history-entry>
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="53020000" />
+    <option name="totallyTimeSpent" value="59192000" />
   </component>
   <component name="TodoView">
     <todo-panel id="selected-file">
@@ -441,7 +486,7 @@
       <window_info id="Favorites" order="6" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" weight="0.14710042" />
-      <window_info active="true" anchor="bottom" id="Run" order="2" sideWeight="0.69839144" visible="true" weight="0.14144272" />
+      <window_info active="true" anchor="bottom" id="Run" order="2" sideWeight="0.69839144" visible="true" weight="0.060820367" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
@@ -530,23 +575,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/common/KeyValue.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="133">
-          <caret line="7" column="17" selection-start-line="7" selection-start-column="11" selection-end-line="7" selection-end-column="17" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/Reducer.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1216">
-          <caret line="73" column="69" selection-start-line="73" selection-start-column="69" selection-end-line="73" selection-end-column="69" />
-          <folding>
-            <element signature="imports" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="jar://C:/Program Files/Java/jdk1.8.0_131/src.zip!/java/util/ArrayList.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="22477">
@@ -557,30 +585,10 @@
     <entry file="jar://$MAVEN_REPOSITORY$/com/alibaba/fastjson/1.2.57/fastjson-1.2.57.jar!/com/alibaba/fastjson/JSON.class">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/MapFunc.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="133">
-          <caret line="9" column="24" selection-start-line="9" selection-start-column="17" selection-end-line="9" selection-end-column="24" />
-          <folding>
-            <element signature="imports" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/ReduceFunc.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="209">
           <caret line="11" column="30" selection-start-line="11" selection-start-column="30" selection-end-line="11" selection-end-column="30" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/WordCount.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="453">
-          <caret line="36" column="58" selection-start-line="36" selection-start-column="42" selection-end-line="36" selection-end-column="58" />
-          <folding>
-            <element signature="imports" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -598,16 +606,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/Mapper.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1805">
-          <caret line="109" column="51" selection-start-line="109" selection-start-column="51" selection-end-line="109" selection-end-column="51" />
-          <folding>
-            <element signature="imports" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/common/Utils.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="258">
@@ -622,20 +620,6 @@
           <folding>
             <element signature="imports" expanded="true" />
           </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/Worker.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="4066">
-          <caret line="235" column="28" selection-start-line="235" selection-start-column="17" selection-end-line="235" selection-end-column="28" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/Master.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="3192">
-          <caret line="193" column="35" selection-start-line="193" selection-start-column="35" selection-end-line="193" selection-end-column="35" />
         </state>
       </provider>
     </entry>
@@ -658,10 +642,71 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/Scheduler.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="358">
-          <caret line="78" column="44" selection-start-line="78" selection-start-column="44" selection-end-line="78" selection-end-column="44" />
+        <state relative-caret-position="219">
+          <caret line="77" column="29" selection-start-line="77" selection-start-column="29" selection-end-line="77" selection-end-column="29" />
           <folding>
             <element signature="imports" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/Worker.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="4041">
+          <caret line="243" column="50" selection-start-line="243" selection-start-column="50" selection-end-line="243" selection-end-column="50" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/MapFunc.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="171">
+          <caret line="9" column="24" selection-start-line="9" selection-start-column="17" selection-end-line="9" selection-end-column="24" />
+          <folding>
+            <element signature="imports" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/Mapper.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="82">
+          <caret line="73" column="22" selection-start-line="73" selection-start-column="5" selection-end-line="73" selection-end-column="22" />
+          <folding>
+            <element signature="imports" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/Master.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="874">
+          <caret line="193" column="35" selection-start-line="193" selection-start-column="35" selection-end-line="193" selection-end-column="35" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/common/KeyValue.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="133">
+          <caret line="7" column="17" selection-start-line="7" selection-start-column="11" selection-end-line="7" selection-end-column="17" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/WordCount.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="320">
+          <caret line="29" column="47" selection-start-line="29" selection-start-column="24" selection-end-line="29" selection-end-column="47" />
+          <folding>
+            <element signature="imports" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/sjtu/sdic/mapreduce/core/Reducer.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="57">
+          <caret line="3" column="39" selection-start-line="3" selection-start-column="39" selection-end-line="3" selection-end-column="39" />
+          <folding>
+            <element signature="e#3169#3177#0" expanded="true" />
           </folding>
         </state>
       </provider>
