@@ -26,5 +26,8 @@
         <sourceDirectory>
             src/main/java
         </sourceDirectory>
+        <scriptSourceDirectory>
+           resources
+        </scriptSourceDirectory>
     </build>
 </project>

@@ -1,11 +1,16 @@
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.Stat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Random;
 
 import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
 
 public class Master implements Watcher {
+
+    private static final Logger LOG = LoggerFactory.getLogger(Master.class);
+
     ZooKeeper zk;
     String hostPort;
     static String serverId;
@@ -69,6 +74,7 @@ public class Master implements Watcher {
         while (true) {
             try {
                 zk.create("/master", serverId.getBytes(), OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+                //创建master节点需要用 CreateMode.EPHEMERAL，即临时节点：节点创建后在创建者超时连接或失去连接的时候，节点会被删除。
                 isLeader = true;
                 break;
             } catch (KeeperException.NodeExistsException e) {
@@ -82,6 +88,38 @@ public class Master implements Watcher {
         }
     }
 
+    void createParent(String path, byte[] data) {
+        zk.create(path, data, OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, createParentCallback, data);
+        // 异步调用
+        // CreateMode.PERSISTENT 永久节点：节点创建后会被持久化，只有主动调用delete方法的时候才可以删除节点
+        // OPEN_ACL_UNSAFE使所有ACL都“开放”了：任何应用程序在节点上可进行任何操作，能创建、列出和删除它的子节点
+    }
+
+    public void boostrap() {
+        createParent("/workers", new byte[0]);
+        createParent("/assign", new byte[0]);
+        createParent("/tasks", new byte[0]);
+    }
+
+    AsyncCallback.StringCallback createParentCallback = new AsyncCallback.StringCallback() {
+        @Override
+        public void processResult(int rc, String path, Object ctx, String name) {
+            switch (KeeperException.Code.get(rc)) {
+                case CONNECTIONLOSS:
+                    createParent(path, (byte[]) ctx);//重试
+                    break;
+                case OK:
+                    LOG.info("Parent created.");
+                    break;
+                case NODEEXISTS:
+                    LOG.warn("Parent already registered:" + path);
+                    break;
+                default:
+                    LOG.error("somthing went wrong" + KeeperException.create(KeeperException.Code.get(rc), path));
+            }
+        }
+    };
+
     public static void main(String args[])
             throws Exception {
         Master m = new Master(args[0]);
@@ -90,13 +128,14 @@ public class Master implements Watcher {
         if (isLeader) {
             System.out.println("I'm the leader.");
             System.out.println("serverId:" + serverId);
+            m.boostrap();
             while (true) {
-                try {
-                    m.getWorkers();
-                } catch (Exception e) {
-                    System.out.println(e);
-                }
-                Thread.sleep(60000);
+//                try {
+//                    m.getWorkers();
+//                } catch (Exception e) {
+//                    System.out.println(e);
+//                }
+                Thread.sleep(600);
             }
         } else {
             System.out.println("Some one else is the leader.");
