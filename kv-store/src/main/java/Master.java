@@ -18,7 +18,8 @@ public class Master implements Watcher {
 
     Master(String hostPort) {
         this.hostPort = hostPort;
-        Random rand = new Random(25);
+        long seed = System.nanoTime();
+        Random rand = new Random( seed);
         serverId = Integer.toString(rand.nextInt() & Integer.MAX_VALUE);
         isLeader = false;
     }
@@ -34,7 +35,7 @@ public class Master implements Watcher {
     public void getWorkers() throws KeeperException, InterruptedException {
         System.out.println("Workers:");
         for (String w : zk.getChildren("/workers", false)) {
-            byte data[] = zk.getData("/workers" + w, false, null);
+            byte data[] = zk.getData("/workers/" + w, false, null);
             String state = new String(data);
             System.out.println("\t" + w + ":" + state);
         }
@@ -74,7 +75,8 @@ public class Master implements Watcher {
         while (true) {
             try {
                 zk.create("/master", serverId.getBytes(), OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-                //创建master节点需要用 CreateMode.EPHEMERAL，即临时节点：节点创建后在创建者超时连接或失去连接的时候，节点会被删除。
+                // create master znode should use CreateMode.EPHEMERAL
+                // so the znode would be deleted when the connection is lost
                 isLeader = true;
                 break;
             } catch (KeeperException.NodeExistsException e) {
@@ -90,9 +92,9 @@ public class Master implements Watcher {
 
     void createParent(String path, byte[] data) {
         zk.create(path, data, OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, createParentCallback, data);
-        // 异步调用
-        // CreateMode.PERSISTENT 永久节点：节点创建后会被持久化，只有主动调用delete方法的时候才可以删除节点
-        // OPEN_ACL_UNSAFE使所有ACL都“开放”了：任何应用程序在节点上可进行任何操作，能创建、列出和删除它的子节点
+        // async call
+        // CreateMode.PERSISTENT means the znode would be durable
+        // OPEN_ACL_UNSAFE means all ACL can create/read/write/delete the znode
     }
 
     public void boostrap() {
@@ -106,7 +108,7 @@ public class Master implements Watcher {
         public void processResult(int rc, String path, Object ctx, String name) {
             switch (KeeperException.Code.get(rc)) {
                 case CONNECTIONLOSS:
-                    createParent(path, (byte[]) ctx);//重试
+                    createParent(path, (byte[]) ctx);//try agagin
                     break;
                 case OK:
                     LOG.info("Parent created.");
@@ -130,11 +132,11 @@ public class Master implements Watcher {
             System.out.println("serverId:" + serverId);
             m.boostrap();
             while (true) {
-//                try {
-//                    m.getWorkers();
-//                } catch (Exception e) {
-//                    System.out.println(e);
-//                }
+                try {
+                    m.getWorkers();
+                } catch (Exception e) {
+                    System.out.println(e);
+                }
                 Thread.sleep(600);
             }
         } else {

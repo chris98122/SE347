@@ -1,16 +1,20 @@
-import org.apache.zookeeper.WatchedEvent;
-import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Random;
 
 public class Worker implements Watcher {
     private static final Logger LOG = LoggerFactory.getLogger(Worker.class);
     ZooKeeper zk;
     String hostPort;
+    String serverId;
 
     Worker(String hostPort) {
         this.hostPort = hostPort;
+        long seed = System.nanoTime();
+        Random rand = new Random( seed);
+        serverId = Integer.toHexString(rand.nextInt() & Integer.MAX_VALUE);
     }
 
     void startZK() {
@@ -23,5 +27,38 @@ public class Worker implements Watcher {
 
     public void process(WatchedEvent e) {
         LOG.info(e.toString() + "," + hostPort);
+    }
+
+    AsyncCallback.StringCallback createWorkerCallback = new AsyncCallback.StringCallback() {
+        @Override
+        public void processResult(int rc, String path, Object ctx, String name) {
+            switch (KeeperException.Code.get(rc)) {
+                case CONNECTIONLOSS:
+                    register();//try agagin
+                    break;
+                case OK:
+                    LOG.info("Registered successfully:" + serverId);
+                    break;
+                case NODEEXISTS:
+                    LOG.warn("Already registered:" + serverId);
+                    break;
+                default:
+                    LOG.error("Something went wrong:" + KeeperException.create(KeeperException.Code.get(rc), path));
+            }
+        }
+    };
+
+    void register() {
+        zk.create("/workers/worker-" + serverId, "Idle".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, createWorkerCallback, null);
+    }
+
+    public static void main(String args[]) throws Exception {
+        Worker w = new Worker(args[0]);
+        w.startZK();
+        w.register();
+        while (true) {
+            Thread.sleep(600);
+        }
+
     }
 }
