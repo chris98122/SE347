@@ -1,3 +1,4 @@
+import lib.Util;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
@@ -23,31 +24,13 @@ public class AdminClient implements Watcher {
         zk = new ZooKeeper(hostPort, 15000, this);
     }
 
-    public void getWorkers() throws KeeperException, InterruptedException {
-        System.out.println("Workers:");
-        for (String w : zk.getChildren("/workers", false)) {
-            byte data[] = zk.getData("/workers" + w, false, null);
-            String state = new String(data);
-            System.out.println("\t" + w + ":" + state);
-        }
-        ;
-    }
-
-    public void getTasks() throws KeeperException, InterruptedException {
-        System.out.println("Tasks:");
-        for (String t : zk.getChildren("/assign", false)) {
-            System.out.println("\t" + t);
-        }
-        ;
-    }
-
     public void process(WatchedEvent e) {
         System.out.println(e);
     }
 
     void listState() throws KeeperException, InterruptedException {
-        getWorkers();
-        getTasks();
+        Util.getWorkers(zk);
+        Util.getTasks(zk);
     }
 }
 

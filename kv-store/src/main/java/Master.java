@@ -1,5 +1,8 @@
 import com.alipay.sofa.rpc.config.ProviderConfig;
 import com.alipay.sofa.rpc.config.ServerConfig;
+import lib.KVService;
+import lib.KVimplement;
+import lib.Util;
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -53,19 +56,22 @@ public class Master implements Watcher {
             System.out.println("serverId:" + serverId);
             m.boostrap();
             m.registerServices();
-            while (true) {
-                try {
-                    m.getWorkers();
-                } catch (Exception e) {
-                    System.out.println(e);
-                }
-                Thread.sleep(600);
-            }
+            m.run();
         } else {
             System.out.println("Some one else is the leader.");
         }
         //  m.stopZK();
+    }
 
+    void run() throws InterruptedException {
+        while (true) {
+            try {
+                Util.getWorkers(zk);
+            } catch (Exception e) {
+                System.out.println(e);
+            }
+            Thread.sleep(600);
+        }
     }
 
     void registerServices() {
@@ -91,14 +97,6 @@ public class Master implements Watcher {
         }
     }
 
-    public void getWorkers() throws KeeperException, InterruptedException {
-        System.out.println("Workers:");
-        for (String w : zk.getChildren("/workers", false)) {
-            byte data[] = zk.getData("/workers/" + w, false, null);
-            String state = new String(data);
-            System.out.println("\t" + w + ":" + state);
-        }
-    }
 
     boolean checkMaster() {
         while (true) {
