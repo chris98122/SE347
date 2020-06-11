@@ -88,7 +88,7 @@ enum RingoDB implements DB {
                         e.printStackTrace();
                     }
                 }
-        ).run();
+        ).start();
     }
 
     public void recover() throws IOException, ClassNotFoundException {

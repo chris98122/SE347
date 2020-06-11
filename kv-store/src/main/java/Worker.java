@@ -8,6 +8,7 @@ import java.util.Random;
 
 public class Worker implements Watcher {
     private static final Logger LOG = LoggerFactory.getLogger(Worker.class);
+    private final String WorkerID;
     ZooKeeper zk;
     String hostPort;
     String serverId;
@@ -30,17 +31,18 @@ public class Worker implements Watcher {
         }
     };
 
-    Worker(String hostPort) throws UnknownHostException {
+    Worker(String hostPort, String WorkerID) throws UnknownHostException {
+        this.WorkerID = WorkerID;
         this.hostPort = hostPort;
         InetAddress addr = InetAddress.getLocalHost();
         long seed = System.nanoTime();
         Random rand = new Random(seed);
-        serverId = addr.getHostAddress() + ":" + Integer.toString(rand.nextInt(5000));
-
+        serverId = addr.getHostAddress() + '-' + WorkerID;
+        // WorkerID is used to distinguish different worker processes on one machine
     }
 
     public static void main(String args[]) throws Exception {
-        Worker w = new Worker(args[0]);
+        Worker w = new Worker(args[0], args[1]);
         w.startZK();
         w.register();
         while (true) {
@@ -62,6 +64,6 @@ public class Worker implements Watcher {
     }
 
     void register() {
-        zk.create("/workers/worker-" + serverId, "Idle".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, createWorkerCallback, null);
+        zk.create("/workers/worker-" + serverId, "UnHashed".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, createWorkerCallback, null);
     }
 }

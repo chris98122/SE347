@@ -10,7 +10,10 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Iterator;
+import java.util.TreeMap;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
 
 public class Master implements Watcher {
@@ -20,6 +23,8 @@ public class Master implements Watcher {
     static Boolean isLeader;
     ZooKeeper zk;
     String hostPort;
+    TreeMap<Integer, String> workermap = new TreeMap<>();
+
     AsyncCallback.StringCallback createParentCallback = new AsyncCallback.StringCallback() {
         @Override
         public void processResult(int rc, String path, Object ctx, String name) {
@@ -51,16 +56,49 @@ public class Master implements Watcher {
         Master m = new Master(args[0]);
         m.startZK();
         m.runForMaster();
-        if (isLeader) {
+        if (m.isLeader) {
             System.out.println("I'm the leader.");
-            System.out.println("serverId:" + serverId);
+            System.out.println("serverId:" + m.serverId);
             m.boostrap();
+            m.hashWorkers();
             m.registerServices();
             m.run();
         } else {
             System.out.println("Some one else is the leader.");
         }
         //  m.stopZK();
+    }
+
+    Integer hashWorkers(String workerstring) {
+        //加密后的字符串
+        String encodeStr=DigestUtils.md5Hex(workerstring);
+        //System.out.println("MD5加密后的字符串为:encodeStr="+encodeStr);
+        return encodeStr.hashCode();
+    }
+
+    String getWorkerIP(String key) {
+        return null;
+    }
+
+    void hashWorkers() throws KeeperException, InterruptedException {
+        System.out.println("Workers:");
+        for (String w : zk.getChildren("/workers", false)) {
+            byte data[] = zk.getData("/workers/" + w, false, null);
+            String workerstate = new String(data);
+            if (workerstate.equals("UnHashed")) {
+                workermap.put(hashWorkers(w), w);
+            }
+        }
+        Iterator iterator = workermap.keySet().iterator();
+        Integer keyStart = workermap.lastKey() ;
+        Integer keyEnd = null;
+        while (iterator.hasNext()) {
+            keyEnd = (Integer) iterator.next();
+            String path= "/workers/" + workermap.get(keyEnd);
+            zk.setData(path,(keyStart.toString()+'/'+keyEnd.toString()).getBytes(),zk.exists(path,true).getVersion());
+            keyStart = keyEnd;
+        }
+
     }
 
     void run() throws InterruptedException {

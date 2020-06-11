@@ -25,13 +25,14 @@ public class RingoDBTest {
     }
 
     @Test
-    public void snapshot() throws IOException, RingoDBException {
+    public void snapshot() throws IOException, RingoDBException, InterruptedException {
         RingoDB.INSTANCE.Put("ringo", "apple");
         RingoDB.INSTANCE.Put("papaya", "mugua");
         RingoDB.INSTANCE.snapshot();
         for (Map.Entry<String, String> item : RingoDB.INSTANCE.map.entrySet()) {
             System.out.println(item.getValue());
         }
+        Thread.sleep(600);
     }
 
     @Test

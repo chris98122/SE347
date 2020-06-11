@@ -83,8 +83,8 @@ public class Client implements Watcher {
     }
 
     void quit() throws InterruptedException {
-        System.out.println("countOfRequest:"+countOfRequest.toString());
-        if (countOfRequest.get()==0) {
+        System.out.println("countOfRequest:" + countOfRequest.toString());
+        if (countOfRequest.get() == 0) {
             System.exit(0);
         }
     }

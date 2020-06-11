@@ -29,11 +29,10 @@ public class Util {
     public static void getWorkers(ZooKeeper zk) throws KeeperException, InterruptedException {
         System.out.println("Workers:");
         for (String w : zk.getChildren("/workers", false)) {
-            byte data[] = zk.getData("/workers" + w, false, null);
+            byte data[] = zk.getData("/workers/" + w, false, null);
             String state = new String(data);
             System.out.println("\t" + w + ":" + state);
         }
-        ;
     }
 
     public static void getTasks(ZooKeeper zk) throws KeeperException, InterruptedException {
@@ -42,4 +41,16 @@ public class Util {
             System.out.println("\t" + t);
         }
     }
+
+    static int M_SHIFT = 0;
+    static int M_MASK = 0x8765fed1;
+    public static int FNVHash(byte[] data) {
+        int hash = (int) 2166136261L;
+        for (byte b : data)
+            hash = (hash * 16777619) ^ b;
+        if (M_SHIFT == 0)
+            return hash;
+        return (hash ^ (hash >> M_SHIFT)) & M_MASK;
+    }
+
 }
