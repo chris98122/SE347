@@ -3,6 +3,7 @@ import com.alipay.sofa.rpc.config.ServerConfig;
 import lib.KVService;
 import lib.KVimplement;
 import lib.Util;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -13,7 +14,6 @@ import java.net.UnknownHostException;
 import java.util.Iterator;
 import java.util.TreeMap;
 
-import org.apache.commons.codec.digest.DigestUtils;
 import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
 
 public class Master implements Watcher {
@@ -43,6 +43,28 @@ public class Master implements Watcher {
             }
         }
     };
+    AsyncCallback.StatCallback rehashcallback = new AsyncCallback.StatCallback() {
+        @Override
+        public void processResult(int rc, String path, Object o, Stat stat) {
+            switch (KeeperException.Code.get(rc)) {
+                case CONNECTIONLOSS:
+                    LOG.info("lose connection to zookeeper");
+                    break;
+                case NONODE:
+                    LOG.info("worker go down when assign keys");
+                    break;
+                case BADVERSION:
+                    LOG.info("BADVERSION");
+                    break;
+                case OK:
+                    LOG.info("set key range successfully");
+                    break;
+                default:
+                    LOG.error("Something went wrong:" + KeeperException.create(KeeperException.Code.get(rc), path));
+            }
+        }
+
+    };
 
     Master(String hostPort) throws UnknownHostException {
         this.hostPort = hostPort;
@@ -71,13 +93,17 @@ public class Master implements Watcher {
 
     Integer hashWorkers(String workerstring) {
         //加密后的字符串
-        String encodeStr=DigestUtils.md5Hex(workerstring);
+        String encodeStr = DigestUtils.md5Hex(workerstring);
         //System.out.println("MD5加密后的字符串为:encodeStr="+encodeStr);
         return encodeStr.hashCode();
     }
 
     String getWorkerIP(String key) {
         return null;
+    }
+
+    void resetkeyrange() {
+
     }
 
     void hashWorkers() throws KeeperException, InterruptedException {
@@ -90,12 +116,12 @@ public class Master implements Watcher {
             }
         }
         Iterator iterator = workermap.keySet().iterator();
-        Integer keyStart = workermap.lastKey() ;
+        Integer keyStart = workermap.lastKey();
         Integer keyEnd = null;
         while (iterator.hasNext()) {
             keyEnd = (Integer) iterator.next();
-            String path= "/workers/" + workermap.get(keyEnd);
-            zk.setData(path,(keyStart.toString()+'/'+keyEnd.toString()).getBytes(),zk.exists(path,true).getVersion());
+            String path = "/workers/" + workermap.get(keyEnd);
+            zk.setData(path, (keyStart.toString() + '/' + keyEnd.toString()).getBytes(), zk.exists(path, true).getVersion(), rehashcallback, null);
             keyStart = keyEnd;
         }
 

@@ -4,6 +4,9 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 
 public class Util {
+    static int M_SHIFT = 0;
+    static int M_MASK = 0x8765fed1;
+
     public static void printthreads() {
         ThreadGroup group = Thread.currentThread().getThreadGroup();
         ThreadGroup topGroup = group;
@@ -42,8 +45,6 @@ public class Util {
         }
     }
 
-    static int M_SHIFT = 0;
-    static int M_MASK = 0x8765fed1;
     public static int FNVHash(byte[] data) {
         int hash = (int) 2166136261L;
         for (byte b : data)
