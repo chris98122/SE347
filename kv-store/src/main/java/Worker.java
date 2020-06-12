@@ -2,7 +2,6 @@ import org.apache.zookeeper.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.InetAddress;
 import java.net.UnknownHostException;
 
 public class Worker implements Watcher {
@@ -30,23 +29,15 @@ public class Worker implements Watcher {
         }
     };
 
-    Worker(String hostPort, String WorkerID) throws UnknownHostException {
+    Worker(String hostPort, String WorkerIP, String WorkerID) throws UnknownHostException {
         this.WorkerID = WorkerID;
         this.hostPort = hostPort;
-        InetAddress addr = null;
-
-        InetAddress[] ia = InetAddress.getAllByName(InetAddress.getLocalHost().getHostAddress());
-        for (int i = 0; i < ia.length; i++) {
-            System.out.println(ia[i].getHostAddress());
-            if (!ia[i].getHostAddress().equals("127.0.0.1"))
-                addr = ia[i];
-        }
-        serverId = addr.getHostAddress() + '-' + WorkerID;
+        serverId = WorkerIP + '-' + WorkerID;
         // WorkerID is used to distinguish different worker processes on one machine
     }
 
     public static void main(String args[]) throws Exception {
-        Worker w = new Worker(args[0], args[1]);
+        Worker w = new Worker(args[0], args[1], args[2]);
         w.startZK();
         w.register();
         while (true) {
