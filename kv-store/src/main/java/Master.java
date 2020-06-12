@@ -82,7 +82,7 @@ public class Master implements Watcher {
             System.out.println("I'm the leader.");
             System.out.println("serverId:" + m.serverId);
             m.boostrap();
-            m.hashWorkers();
+            //  m.hashWorkers();
             m.registerServices();
             m.run();
         } else {
