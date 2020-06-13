@@ -33,6 +33,7 @@ public class Master<PAIR> implements Watcher, MasterService {
         public void processResult(int rc, String path, Object ctx, String name) {
             switch (KeeperException.Code.get(rc)) {
                 case CONNECTIONLOSS:
+                    LOG.info("retry register to zookeeper " + serverId);
                     createParent(path, (byte[]) ctx);//try agagin
                     break;
                 case OK:

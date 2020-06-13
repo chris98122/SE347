@@ -20,6 +20,7 @@ public class Worker implements Watcher, WorkerService {
         public void processResult(int rc, String path, Object ctx, String name) {
             switch (KeeperException.Code.get(rc)) {
                 case CONNECTIONLOSS:
+                    LOG.info("retry register to zookeeper " + serverId);
                     registerToZookeeper();//try agagin
                     break;
                 case OK:
@@ -48,7 +49,7 @@ public class Worker implements Watcher, WorkerService {
         w.registerToZookeeper();// if the worker is a new one, master should call rpc SetKeyRange
 
         while (true) {
-            Thread.sleep(6000);
+            Thread.sleep(600);
         }
 
     }
