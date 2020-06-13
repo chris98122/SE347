@@ -41,7 +41,7 @@ public class MasterTest {
         if (m.isLeader) {
             m.boostrap();
             Thread.sleep(600);
-            m. InitialhashWorkers();
+            m.InitialhashWorkers();
             showWorkerRange(m.zk);
         } else {
             System.out.println("Some one else is the leader.");

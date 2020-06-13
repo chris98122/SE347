@@ -1,7 +1,6 @@
 import com.alipay.sofa.rpc.config.ConsumerConfig;
 import com.alipay.sofa.rpc.config.ProviderConfig;
 import com.alipay.sofa.rpc.config.ServerConfig;
-import javafx.util.Pair;
 import lib.KVService;
 import lib.KVimplement;
 import lib.MWService;
@@ -13,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.TreeMap;
@@ -27,7 +27,7 @@ public class Master<PAIR> implements Watcher {
     ZooKeeper zk;
     String hostPort;
     TreeMap<Integer, String> workermap = new TreeMap<>();// helper structure for calculating workerkeymap
-    TreeMap<String, Pair<String, String>> workerkeymap = new TreeMap<>();
+    TreeMap<String, List<String >> workerkeymap = new TreeMap<>();
     TreeMap<String, String> workerstate = new TreeMap<>();
 
     AsyncCallback.StringCallback createParentCallback = new AsyncCallback.StringCallback() {
@@ -162,7 +162,10 @@ public class Master<PAIR> implements Watcher {
         while (iterator.hasNext()) {
             keyEnd = (Integer) iterator.next();
             // 假设主节点从不fail，将所有workerhash保存在workerkeymap,
-            workerkeymap.put(workermap.get(keyEnd), new Pair<String, String>(keyStart.toString(), keyEnd.toString()));
+            List<String> list= new ArrayList();
+            list.add(keyStart.toString() );
+            list.add(keyEnd.toString() );
+            workerkeymap.put(workermap.get(keyEnd),list);
             keyStart = keyEnd;
         }
         // send all key range to Worker
@@ -173,7 +176,7 @@ public class Master<PAIR> implements Watcher {
             String workerip = key.split(":")[0];
             String workerport = key.split(":")[1];
             MWService mvService = GetServiceByWorkerIP(workerip, workerport);
-            LOG.info("[RPC RESPONSE]"+mvService.SetKeyRange(workerkeymap.get(key).getKey(), workerkeymap.get(key).getValue()));
+            LOG.info("[RPC RESPONSE]" + mvService.SetKeyRange(workerkeymap.get(key).get(0), workerkeymap.get(key).get(1)));
         }
     }
 
@@ -181,7 +184,7 @@ public class Master<PAIR> implements Watcher {
         ConsumerConfig<MWService> consumerConfig = new ConsumerConfig<MWService>()
                 .setInterfaceId(MWService.class.getName()) // 指定接口
                 .setProtocol("bolt") // 指定协议
-                .setDirectUrl("bolt://" + workerip +":"+ port) // 指定直连地址
+                .setDirectUrl("bolt://" + workerip + ":" + port) // 指定直连地址
                 .setTimeout(2000);
         // 生成代理类
         MWService mvService = consumerConfig.refer();
