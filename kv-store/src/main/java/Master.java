@@ -1,8 +1,10 @@
+import com.alipay.sofa.rpc.config.ConsumerConfig;
 import com.alipay.sofa.rpc.config.ProviderConfig;
 import com.alipay.sofa.rpc.config.ServerConfig;
+import javafx.util.Pair;
 import lib.KVService;
 import lib.KVimplement;
-import lib.Util;
+import lib.MWService;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.Stat;
@@ -12,18 +14,21 @@ import org.slf4j.LoggerFactory;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Iterator;
+import java.util.List;
 import java.util.TreeMap;
 
 import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
 
-public class Master implements Watcher {
+public class Master<PAIR> implements Watcher {
 
     private static final Logger LOG = LoggerFactory.getLogger(Master.class);
     static String serverId;
     static Boolean isLeader;
     ZooKeeper zk;
     String hostPort;
-    TreeMap<Integer, String> workermap = new TreeMap<>();
+    TreeMap<Integer, String> workermap = new TreeMap<>();// helper structure for calculating workerkeymap
+    TreeMap<String, Pair<String, String>> workerkeymap = new TreeMap<>();
+    TreeMap<String, String> workerstate = new TreeMap<>();
 
     AsyncCallback.StringCallback createParentCallback = new AsyncCallback.StringCallback() {
         @Override
@@ -43,24 +48,42 @@ public class Master implements Watcher {
             }
         }
     };
-    AsyncCallback.StatCallback rehashcallback = new AsyncCallback.StatCallback() {
+    //主节点等待从节点的变化（包括worker node fail 或者 增加）
+    //ZooKeeper客户端也可以通过getData，getChildren和exist三个接口来向ZooKeeper服务器注册Watcher
+    Watcher workersChangeWatcher = new Watcher() {
+        public void process(WatchedEvent e) {
+            if (e.getType() == Event.EventType.NodeChildrenChanged) {
+                assert ("/workers".equals(e.getPath()));
+                try {
+                    getWorkers();
+                } catch (KeeperException keeperException) {
+                    keeperException.printStackTrace();
+                } catch (InterruptedException interruptedException) {
+                    interruptedException.printStackTrace();
+                }
+            }
+        }
+
+    };
+    AsyncCallback.ChildrenCallback workerGetChildrenCallback = new AsyncCallback.ChildrenCallback() {
         @Override
-        public void processResult(int rc, String path, Object o, Stat stat) {
+        public void processResult(int rc, String path, Object ctx, List<String> children) {
             switch (KeeperException.Code.get(rc)) {
                 case CONNECTIONLOSS:
-                    LOG.info("lose connection to zookeeper");
-                    break;
-                case NONODE:
-                    LOG.info("worker go down when assign keys");
-                    break;
-                case BADVERSION:
-                    LOG.info("BADVERSION");
+                    try {
+                        getWorkers();
+                    } catch (KeeperException e) {
+                        e.printStackTrace();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
                     break;
                 case OK:
-                    LOG.info("set key range successfully");
+                    LOG.info("Successfully got a list of workers:" + children.size() + "workers");
+                    reassignAndSet(children);
                     break;
                 default:
-                    LOG.error("Something went wrong:" + KeeperException.create(KeeperException.Code.get(rc), path));
+                    LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
             }
         }
 
@@ -82,13 +105,28 @@ public class Master implements Watcher {
             System.out.println("I'm the leader.");
             System.out.println("serverId:" + m.serverId);
             m.boostrap();
-            //  m.hashWorkers();
-            m.registerServices();
+            m.InitialhashWorkers();
+            m.getWorkers();//register the "/worker"" Watcher
+
+            m.registerRPCServices(); //after setting the Master-Worker , the Master can receive rpc from clients
             m.run();
         } else {
             System.out.println("Some one else is the leader.");
         }
         //  m.stopZK();
+    }
+
+    void reassignAndSet(List<String> children) {
+        // reassign worker keyrange
+    }
+
+    public void getWorkers() throws KeeperException, InterruptedException {
+        System.out.println("Workers:");
+        for (String w : zk.getChildren("/workers", false)) {
+            byte data[] = zk.getData("/workers/" + w, workersChangeWatcher, null);
+            String state = new String(data);
+            System.out.println("\t" + w + ":" + state);
+        }
     }
 
     Integer hashWorkers(String workerstring) {
@@ -106,12 +144,15 @@ public class Master implements Watcher {
 
     }
 
-    void hashWorkers() throws KeeperException, InterruptedException {
+    void InitialhashWorkers() throws KeeperException, InterruptedException {
+        //此函数只在启动master时运行一次
+        //可扩展性与workerfail依靠对worker znode的Watcher函数
+
         System.out.println("Workers:");
         for (String w : zk.getChildren("/workers", false)) {
             byte data[] = zk.getData("/workers/" + w, false, null);
             String workerstate = new String(data);
-            if (workerstate.equals("UnHashed")) {
+            if (workerstate.equals("UnHashed")) {// workerstate stored in znode seems useless, may delete this afterwards
                 workermap.put(hashWorkers(w), w);
             }
         }
@@ -120,25 +161,40 @@ public class Master implements Watcher {
         Integer keyEnd = null;
         while (iterator.hasNext()) {
             keyEnd = (Integer) iterator.next();
-            String path = "/workers/" + workermap.get(keyEnd);
-            zk.setData(path, (keyStart.toString() + '/' + keyEnd.toString()).getBytes(), zk.exists(path, true).getVersion(), rehashcallback, null);
+            // 假设主节点从不fail，将所有workerhash保存在workerkeymap,
+            workerkeymap.put(workermap.get(keyEnd), new Pair<String, String>(keyStart.toString(), keyEnd.toString()));
             keyStart = keyEnd;
         }
+        // send all key range to Worker
+        iterator = workerkeymap.keySet().iterator();
+        while (iterator.hasNext()) {
+            String key = (String) iterator.next();
+            String workerip = key.split(":")[0];
+            String workerport = key.split(":")[1];
+            MWService mvService = GetServiceByWorkerIP(workerip, workerport);
+            mvService.SetKeyRange(workerkeymap.get(key).getKey(), workerkeymap.get(key).getValue());
+        }
+    }
 
+    MWService GetServiceByWorkerIP(String workerip, String port) {
+        ConsumerConfig<MWService> consumerConfig = new ConsumerConfig<MWService>()
+                .setInterfaceId(MWService.class.getName()) // 指定接口
+                .setProtocol("bolt") // 指定协议
+                .setDirectUrl("bolt://" + workerip + ":12200") // 指定直连地址
+                .setTimeout(2000);
+        // 生成代理类
+        MWService mvService = consumerConfig.refer();
+        return mvService;
     }
 
     void run() throws InterruptedException {
         while (true) {
-            try {
-                Util.getWorkers(zk);
-            } catch (Exception e) {
-                System.out.println(e);
-            }
+
             Thread.sleep(600);
         }
     }
 
-    void registerServices() {
+    void registerRPCServices() {
 
         ServerConfig serverConfig = new ServerConfig()
                 .setProtocol("bolt") // 设置一个协议，默认bolt

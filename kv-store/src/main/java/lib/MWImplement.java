@@ -1,6 +1,11 @@
 package lib;
 
-public class KVimplement implements KVService {
+public class MWImplement implements MWService {
+    @Override
+    public String SetKeyRange(String keystart, String keyend) {
+        return  keystart+" "+keyend;
+    }
+
     @Override
     public String PUT(String key, String value) {
         System.out.println("put" + key + value);
@@ -9,13 +14,11 @@ public class KVimplement implements KVService {
 
     @Override
     public String GET(String key) {
-        System.out.println("GET" + key);
         return "GET" + key;
     }
 
     @Override
     public String DELETE(String key) {
-        System.out.println("delete" + key);
         return "delete" + key;
     }
 }
