@@ -12,13 +12,34 @@ public class ClientTest {
         assertFalse(Client.isvalid(" put put  "));
 
     }
+
     @Test
     public void PUTTEST() throws Exception {
 
         Client client = new Client(Config.zookeeperHost);
         client.startZK();
-        MasterService masterService =  client.MasterConnection();
-        assertTrue(masterService.PUT("ringo","apple").equals("OK"));
+        Thread.sleep(50);
+        MasterService masterService = client.MasterConnection();
+        assertEquals("OK", masterService.PUT("ringo", "apple"));
+        assertEquals("OK", masterService.PUT("ringo", "apple"));
+        assertEquals("OK", masterService.PUT("ringo", "apple"));
+    }
 
+    @Test
+    public void GETTEST() throws Exception {
+        Client client = new Client(Config.zookeeperHost);
+        client.startZK();
+        MasterService masterService = client.MasterConnection();
+        assertEquals("OK", masterService.PUT("ringo", "apple"));
+        assertEquals("apple", masterService.GET("ringo"));
+    }
+
+    @Test
+    public void nullvalueTest() throws Exception {
+        Client client = new Client(Config.zookeeperHost);
+        client.startZK();
+        MasterService masterService = client.MasterConnection();
+        assertEquals("OK", masterService.PUT("null", null));
+        assertEquals(null, masterService.GET("null"));
     }
 }

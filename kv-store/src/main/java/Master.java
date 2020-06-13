@@ -12,10 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.TreeMap;
+import java.util.*;
 
 import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
 
@@ -28,6 +25,8 @@ public class Master<PAIR> implements Watcher, MasterService {
     TreeMap<Integer, String> workermap = new TreeMap<>();// helper structure for calculating workerkeymap
     TreeMap<String, List<String>> workerkeymap = new TreeMap<>();
     TreeMap<String, String> workerstate = new TreeMap<>();
+    HashMap<String, ConsumerConfig<WorkerService>> workerConsumerConfigHashMap = new HashMap<String, ConsumerConfig<WorkerService>>();
+
     AsyncCallback.StringCallback createParentCallback = new AsyncCallback.StringCallback() {
         @Override
         public void processResult(int rc, String path, Object ctx, String name) {
@@ -46,23 +45,6 @@ public class Master<PAIR> implements Watcher, MasterService {
                     LOG.error("somthing went wrong" + KeeperException.create(KeeperException.Code.get(rc), path));
             }
         }
-    };
-    //主节点等待从节点的变化（包括worker node fail 或者 增加）
-    //ZooKeeper客户端也可以通过getData，getChildren和exist三个接口来向ZooKeeper服务器注册Watcher
-    Watcher workersChangeWatcher = new Watcher() {
-        public void process(WatchedEvent e) {
-            if (e.getType() == Event.EventType.NodeChildrenChanged) {
-                assert ("/workers".equals(e.getPath()));
-                try {
-                    getWorkers();
-                } catch (KeeperException keeperException) {
-                    keeperException.printStackTrace();
-                } catch (InterruptedException interruptedException) {
-                    interruptedException.printStackTrace();
-                }
-            }
-        }
-
     };
     AsyncCallback.ChildrenCallback workerGetChildrenCallback = new AsyncCallback.ChildrenCallback() {
         @Override
@@ -83,6 +65,23 @@ public class Master<PAIR> implements Watcher, MasterService {
                     break;
                 default:
                     LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
+            }
+        }
+
+    };
+    //主节点等待从节点的变化（包括worker node fail 或者 增加）
+    //ZooKeeper客户端也可以通过getData，getChildren和exist三个接口来向ZooKeeper服务器注册Watcher
+    Watcher workersChangeWatcher = new Watcher() {
+        public void process(WatchedEvent e) {
+            if (e.getType() == Event.EventType.NodeChildrenChanged) {
+                assert ("/workers".equals(e.getPath()));
+                try {
+                    getWorkers();
+                } catch (KeeperException keeperException) {
+                    keeperException.printStackTrace();
+                } catch (InterruptedException interruptedException) {
+                    interruptedException.printStackTrace();
+                }
             }
         }
 
@@ -122,13 +121,10 @@ public class Master<PAIR> implements Watcher, MasterService {
 
     @Override
     public String PUT(String key, String value) {
-        String WorkerAddr = getWorkerIP(key);
-        System.out.println(WorkerAddr);
-        String workerip = WorkerAddr.split(":")[0];
-        String workerport = WorkerAddr.split(":")[1];
+        String WorkerAddr = getWorkerADDR(key);
         try {
-            WorkerService workerService = GetServiceByWorkerIP(workerip, workerport);
-            LOG.info("ASSIGN PUT TO" + WorkerAddr);
+            WorkerService workerService = GetServiceByWorkerADDR(WorkerAddr);
+            LOG.info("ASSIGN PUT " + key + ":" + value + " TO" + WorkerAddr);
             return workerService.PUT(key, value);
         } catch (Exception e) {
             e.printStackTrace();
@@ -138,8 +134,15 @@ public class Master<PAIR> implements Watcher, MasterService {
 
     @Override
     public String GET(String key) {
-        System.out.println("GET" + key);
-        return "GET" + key;
+        String WorkerAddr = getWorkerADDR(key);
+        try {
+            WorkerService workerService = GetServiceByWorkerADDR(WorkerAddr);
+            LOG.info("ASSIGN GET " + key + " TO" + WorkerAddr);
+            return workerService.GET(key);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "ERR";
     }
 
     @Override
@@ -153,12 +156,7 @@ public class Master<PAIR> implements Watcher, MasterService {
     }
 
     public void getWorkers() throws KeeperException, InterruptedException {
-        System.out.println("Workers:");
-        for (String w : zk.getChildren("/workers", false)) {
-            byte data[] = zk.getData("/workers/" + w, workersChangeWatcher, null);
-            String state = new String(data);
-            System.out.println("\t" + w + ":" + state);
-        }
+        zk.getChildren("/workers", workersChangeWatcher, workerGetChildrenCallback, null);
     }
 
     Integer Hash(String workerstring) {
@@ -168,7 +166,7 @@ public class Master<PAIR> implements Watcher, MasterService {
         return encodeStr.hashCode();
     }
 
-    String getWorkerIP(String keyString) {
+    String getWorkerADDR(String keyString) {
         Integer hashvalue = Hash(keyString);
         Iterator iterator = workerkeymap.keySet().iterator();
         while (iterator.hasNext()) {
@@ -220,25 +218,30 @@ public class Master<PAIR> implements Watcher, MasterService {
         // send all key range to Worker
         iterator = workerkeymap.keySet().iterator();
         while (iterator.hasNext()) {
-            String key = (String) iterator.next();
-            // System.out.println(key);
-            String workerip = key.split(":")[0];
-            String workerport = key.split(":")[1];
-            WorkerService workerService = GetServiceByWorkerIP(workerip, workerport);
+            String workerAddr = (String) iterator.next();
+            WorkerService workerService = GetServiceByWorkerADDR(workerAddr);
             try {
-                LOG.info("[RPC RESPONSE]" + workerService.SetKeyRange(workerkeymap.get(key).get(0), workerkeymap.get(key).get(1)));
+                LOG.info("[RPC RESPONSE]" + workerService.SetKeyRange(workerkeymap.get(workerAddr).get(0), workerkeymap.get(workerAddr).get(1)));
             } catch (SofaRpcException e) {
                 LOG.error(String.valueOf(e));
             }
         }
     }
 
-    WorkerService GetServiceByWorkerIP(String workerip, String port) {
-        ConsumerConfig<WorkerService> consumerConfig = new ConsumerConfig<WorkerService>()
-                .setInterfaceId(WorkerService.class.getName()) // 指定接口
-                .setProtocol("bolt") // 指定协议
-                .setDirectUrl("bolt://" + workerip + ":" + port) // 指定直连地址
-                .setTimeout(2000);
+    WorkerService GetServiceByWorkerADDR(String WorkerAddr) {
+        ConsumerConfig<WorkerService> consumerConfig;
+        if (workerConsumerConfigHashMap.get(WorkerAddr) == null) {
+            String workerip = WorkerAddr.split(":")[0];
+            String workerport = WorkerAddr.split(":")[1];
+            consumerConfig = new ConsumerConfig<WorkerService>()
+                    .setInterfaceId(WorkerService.class.getName()) // 指定接口
+                    .setProtocol("bolt") // 指定协议
+                    .setDirectUrl("bolt://" + workerip + ":" + workerport) // 指定直连地址
+                    .setTimeout(2000);
+            workerConsumerConfigHashMap.put(WorkerAddr, consumerConfig);
+        } else {
+            consumerConfig = workerConsumerConfigHashMap.get(WorkerAddr);
+        }
         // 生成代理类
         WorkerService workerService = consumerConfig.refer();
         return workerService;

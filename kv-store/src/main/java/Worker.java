@@ -61,6 +61,10 @@ public class Worker implements Watcher, WorkerService {
         if (this.KeyStart == null && this.KeyEnd == null) {
             this.KeyStart = keystart;
             this.KeyEnd = keyend;
+            LOG.info("initialize keyrage to " + keystart + ":" + keyend);
+            return "OK";
+        } else if (this.KeyStart.equals(keystart) && this.KeyEnd.equals(keyend)) {
+            LOG.info("reset keyrage to same value.");
             return "OK";
         }
         return "ERR";

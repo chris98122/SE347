@@ -1,5 +1,3 @@
-import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.ZooKeeper;
 import org.junit.Test;
 
 import java.util.Iterator;
@@ -15,7 +13,7 @@ public class MasterTest {
                     () ->
                     {
                         try {
-                            String worker2args[] = {Config.zookeeperHost, finalI.toString(),"1220"+finalI.toString()};
+                            String worker2args[] = {Config.zookeeperHost, finalI.toString(), "1220" + finalI.toString()};
                             Worker.main(worker2args);//worker 2
                         } catch (Exception e) {
                             e.printStackTrace();
@@ -30,13 +28,14 @@ public class MasterTest {
         if (m.isLeader) {
             m.boostrap();
             Thread.sleep(600);
-            m.InitialhashWorkers(); ;
-            Iterator iterator =  m.workerkeymap.keySet().iterator();
+            m.InitialhashWorkers();
+            ;
+            Iterator iterator = m.workerkeymap.keySet().iterator();
             while (iterator.hasNext()) {
                 String workerkey = (String) iterator.next();
                 // System.out.println(key);
-                List<String> list= (List<String>)m.workerkeymap.get(workerkey);
-                System.out.println(list.get(0)+"-"+list.get(1));
+                List<String> list = (List<String>) m.workerkeymap.get(workerkey);
+                System.out.println(list.get(0) + "-" + list.get(1));
                 // else if((hashvalue >= keyEnd || hashvalue<keyStart)&& k
             }
         } else {

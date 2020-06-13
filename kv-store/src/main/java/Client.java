@@ -1,10 +1,7 @@
 import com.alipay.sofa.rpc.config.ConsumerConfig;
 import com.alipay.sofa.rpc.core.exception.SofaRpcException;
 import lib.MasterService;
-import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.WatchedEvent;
-import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +25,26 @@ public class Client implements Watcher {
     String hostPort;
     String masterip;
     CountDownLatch latch;
+    AsyncCallback.DataCallback readmasterCallback = new AsyncCallback.DataCallback() {
+        @Override
+        public void processResult(int rc, String path, Object o, byte[] bytes, Stat stat) {
+            switch (KeeperException.Code.get(rc)) {
+                case CONNECTIONLOSS:
+                    zk.getData("/master", false, readmasterCallback, null);
+                    LOG.info("retry get master ip");
+                    break;
+                case OK:
+                    masterip = new String(bytes);
+                    LOG.info("get master ip");
+                    break;
+                case NONODE:
+                    zk.getData("/master", false, readmasterCallback, null);
+                    LOG.info("no node master,retry");
+                default:
+                    LOG.error("somthing went wrong" + KeeperException.create(KeeperException.Code.get(rc), path));
+            }
+        }
+    };
 
     Client(String hostPort) {
         this.hostPort = hostPort;
@@ -59,21 +76,7 @@ public class Client implements Watcher {
     }
 
     public MasterService MasterConnection() {
-        Stat stat = new Stat();
-        byte data[];
-        Boolean trying = true;
-        while (trying) {
-            try {
-                data = zk.getData("/master", false, stat);
-                trying = false;
-                masterip = new String(data);
-                System.out.println(new String(data));
-                break;
-            } catch (KeeperException | InterruptedException e) {
-
-                LOG.info("retry get master ip");
-            }
-        }
+        zk.getData("/master", false, readmasterCallback, null);
 
         ConsumerConfig<MasterService> consumerConfig = new ConsumerConfig<MasterService>()
                 .setInterfaceId(MasterService.class.getName()) // 指定接口
