@@ -27,7 +27,7 @@ public class Master<PAIR> implements Watcher {
     ZooKeeper zk;
     String hostPort;
     TreeMap<Integer, String> workermap = new TreeMap<>();// helper structure for calculating workerkeymap
-    TreeMap<String, List<String >> workerkeymap = new TreeMap<>();
+    TreeMap<String, List<String>> workerkeymap = new TreeMap<>();
     TreeMap<String, String> workerstate = new TreeMap<>();
 
     AsyncCallback.StringCallback createParentCallback = new AsyncCallback.StringCallback() {
@@ -97,19 +97,24 @@ public class Master<PAIR> implements Watcher {
     }
 
     public static void main(String args[])
-            throws Exception {
+            throws Exception, MWException {
         Master m = new Master(args[0]);
         m.startZK();
         m.runForMaster();
         if (m.isLeader) {
-            System.out.println("I'm the leader.");
-            System.out.println("serverId:" + m.serverId);
-            m.boostrap();
-            m.InitialhashWorkers();
-            m.getWorkers();//register the "/worker"" Watcher
+            try {
+                System.out.println("I'm the leader.");
+                System.out.println("serverId:" + m.serverId);
+                m.boostrap();
+                m.InitialhashWorkers();
+                m.getWorkers();//register the "/worker"" Watcher
 
-            m.registerRPCServices(); //after setting the Master-Worker , the Master can receive rpc from clients
-            m.run();
+                m.registerRPCServices(); //after setting the Master-Worker , the Master can receive rpc from clients
+                m.run();
+            } catch (MWException e) {
+                e.printStackTrace();
+                System.out.println(e.getMessage());
+            }
         } else {
             System.out.println("Some one else is the leader.");
         }
@@ -144,17 +149,21 @@ public class Master<PAIR> implements Watcher {
 
     }
 
-    void InitialhashWorkers() throws KeeperException, InterruptedException {
+    void InitialhashWorkers() throws KeeperException, InterruptedException, MWException {
         //此函数只在启动master时运行一次
         //可扩展性与workerfail依靠对worker znode的Watcher函数
 
         System.out.println("Workers:");
         for (String w : zk.getChildren("/workers", false)) {
             byte data[] = zk.getData("/workers/" + w, false, null);
+            System.out.println(w);
             String workerstate = new String(data);
             if (workerstate.equals("UnHashed")) {// workerstate stored in znode seems useless, may delete this afterwards
                 workermap.put(hashWorkers(w), w);
             }
+        }
+        if (workermap.isEmpty()) {
+            throw new MWException("workers not exist");
         }
         Iterator iterator = workermap.keySet().iterator();
         Integer keyStart = workermap.lastKey();
@@ -162,10 +171,10 @@ public class Master<PAIR> implements Watcher {
         while (iterator.hasNext()) {
             keyEnd = (Integer) iterator.next();
             // 假设主节点从不fail，将所有workerhash保存在workerkeymap,
-            List<String> list= new ArrayList();
-            list.add(keyStart.toString() );
-            list.add(keyEnd.toString() );
-            workerkeymap.put(workermap.get(keyEnd),list);
+            List<String> list = new ArrayList();
+            list.add(keyStart.toString());
+            list.add(keyEnd.toString());
+            workerkeymap.put(workermap.get(keyEnd), list);
             keyStart = keyEnd;
         }
         // send all key range to Worker

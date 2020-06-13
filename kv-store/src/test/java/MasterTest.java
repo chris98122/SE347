@@ -19,7 +19,7 @@ public class MasterTest {
     }
 
     @Test
-    public void hashWorkers() throws Exception {
+    public void hashWorkers() throws Exception, MWException {
         for (Integer i = 0; i < 10; i++) {
             Integer finalI = i;
             new Thread(
