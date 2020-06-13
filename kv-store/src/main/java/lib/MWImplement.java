@@ -3,7 +3,7 @@ package lib;
 public class MWImplement implements MWService {
     @Override
     public String SetKeyRange(String keystart, String keyend) {
-        return  keystart+" "+keyend;
+        return keystart + " " + keyend;
     }
 
     @Override

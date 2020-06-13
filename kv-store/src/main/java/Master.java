@@ -169,10 +169,11 @@ public class Master<PAIR> implements Watcher {
         iterator = workerkeymap.keySet().iterator();
         while (iterator.hasNext()) {
             String key = (String) iterator.next();
+            // System.out.println(key);
             String workerip = key.split(":")[0];
             String workerport = key.split(":")[1];
             MWService mvService = GetServiceByWorkerIP(workerip, workerport);
-            mvService.SetKeyRange(workerkeymap.get(key).getKey(), workerkeymap.get(key).getValue());
+            LOG.info("[RPC RESPONSE]"+mvService.SetKeyRange(workerkeymap.get(key).getKey(), workerkeymap.get(key).getValue()));
         }
     }
 
@@ -180,7 +181,7 @@ public class Master<PAIR> implements Watcher {
         ConsumerConfig<MWService> consumerConfig = new ConsumerConfig<MWService>()
                 .setInterfaceId(MWService.class.getName()) // 指定接口
                 .setProtocol("bolt") // 指定协议
-                .setDirectUrl("bolt://" + workerip + ":12200") // 指定直连地址
+                .setDirectUrl("bolt://" + workerip +":"+ port) // 指定直连地址
                 .setTimeout(2000);
         // 生成代理类
         MWService mvService = consumerConfig.refer();

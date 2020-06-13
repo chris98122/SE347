@@ -29,8 +29,7 @@ public class AdminClient implements Watcher {
     }
 
     void listState() throws KeeperException, InterruptedException {
-        Util.getWorkers(zk);
-        Util.getTasks(zk);
+
     }
 }
 
