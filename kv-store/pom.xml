@@ -12,7 +12,9 @@
             <id>ali-maven</id>
             <url>http://maven.aliyun.com/nexus/content/groups/public</url>
             <layout>default</layout>
-            <releases><enabled>true</enabled></releases>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
         </repository>
     </repositories>
 
@@ -57,12 +59,12 @@
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>
-<!--                    <archive>-->
-<!--                        <manifest>-->
-<!--                            &lt;!&ndash; 此处指定main方法入口的class &ndash;&gt;-->
-<!--                            <mainClass>Worker</mainClass>-->
-<!--                        </manifest>-->
-<!--                    </archive>-->
+                    <!--                    <archive>-->
+                    <!--                        <manifest>-->
+                    <!--                            &lt;!&ndash; 此处指定main方法入口的class &ndash;&gt;-->
+                    <!--                            <mainClass>Worker</mainClass>-->
+                    <!--                        </manifest>-->
+                    <!--                    </archive>-->
                 </configuration>
                 <executions>
                     <execution>
@@ -79,16 +81,17 @@
                 <version>2.5</version>
                 <executions>
                     <execution>
-                        <id>copy-log4jproperty</id>
+                        <id>copy-scripts</id>
                         <phase>process-sources</phase>
                         <goals>
                             <goal>copy-resources</goal>
                         </goals>
                         <configuration>
-                            <outputDirectory>${basedir}/target/classes</outputDirectory>
+                            <outputDirectory>${basedir}/target</outputDirectory>
                             <resources>
                                 <resource>
                                     <directory>${basedir}/src/main/config</directory>
+                                    <directory>${basedir}/src/main/deploy</directory>
                                 </resource>
                             </resources>
                         </configuration>
