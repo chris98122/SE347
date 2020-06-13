@@ -122,8 +122,18 @@ public class Master<PAIR> implements Watcher, MasterService {
 
     @Override
     public String PUT(String key, String value) {
-
-        return "put" + key + value;
+        String WorkerAddr = getWorkerIP(key);
+        System.out.println(WorkerAddr);
+        String workerip = WorkerAddr.split(":")[0];
+        String workerport = WorkerAddr.split(":")[1];
+        try {
+            WorkerService workerService = GetServiceByWorkerIP(workerip, workerport);
+            LOG.info("ASSIGN PUT TO" + WorkerAddr);
+            return workerService.PUT(key, value);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "ERR";
     }
 
     @Override
@@ -151,15 +161,28 @@ public class Master<PAIR> implements Watcher, MasterService {
         }
     }
 
-    Integer hashWorkers(String workerstring) {
+    Integer Hash(String workerstring) {
         //加密后的字符串
         String encodeStr = DigestUtils.md5Hex(workerstring);
         //System.out.println("MD5加密后的字符串为:encodeStr="+encodeStr);
         return encodeStr.hashCode();
     }
 
-    String getWorkerIP(String key) {
-        return null;
+    String getWorkerIP(String keyString) {
+        Integer hashvalue = Hash(keyString);
+        Iterator iterator = workerkeymap.keySet().iterator();
+        while (iterator.hasNext()) {
+            String workerkey = (String) iterator.next();
+            // System.out.println(key);
+            Integer keyStart = Integer.valueOf(workerkeymap.get(workerkey).get(0));
+            Integer keyEnd = Integer.valueOf(workerkeymap.get(workerkey).get(1));
+            if (hashvalue >= keyStart && hashvalue < keyEnd) {
+                return workerkey;
+            } else if ((hashvalue >= keyEnd || hashvalue < keyStart) && keyStart > keyEnd) {
+                return workerkey;
+            }
+        }
+        return "ERR";
     }
 
     void resetkeyrange() {
@@ -173,10 +196,10 @@ public class Master<PAIR> implements Watcher, MasterService {
         System.out.println("Workers:");
         for (String w : zk.getChildren("/workers", false)) {
             byte data[] = zk.getData("/workers/" + w, false, null);
-            System.out.println(w);
+            //System.out.println(w);
             String workerstate = new String(data);
             if (workerstate.equals("UnHashed")) {// workerstate stored in znode seems useless, may delete this afterwards
-                workermap.put(hashWorkers(w), w);
+                workermap.put(Hash(w), w);
             }
         }
         if (workermap.isEmpty()) {
@@ -201,9 +224,9 @@ public class Master<PAIR> implements Watcher, MasterService {
             // System.out.println(key);
             String workerip = key.split(":")[0];
             String workerport = key.split(":")[1];
-            WorkerService mvService = GetServiceByWorkerIP(workerip, workerport);
+            WorkerService workerService = GetServiceByWorkerIP(workerip, workerport);
             try {
-                LOG.info("[RPC RESPONSE]" + mvService.SetKeyRange(workerkeymap.get(key).get(0), workerkeymap.get(key).get(1)));
+                LOG.info("[RPC RESPONSE]" + workerService.SetKeyRange(workerkeymap.get(key).get(0), workerkeymap.get(key).get(1)));
             } catch (SofaRpcException e) {
                 LOG.error(String.valueOf(e));
             }
@@ -217,8 +240,8 @@ public class Master<PAIR> implements Watcher, MasterService {
                 .setDirectUrl("bolt://" + workerip + ":" + port) // 指定直连地址
                 .setTimeout(2000);
         // 生成代理类
-        WorkerService mvService = consumerConfig.refer();
-        return mvService;
+        WorkerService workerService = consumerConfig.refer();
+        return workerService;
     }
 
     void run() throws InterruptedException {

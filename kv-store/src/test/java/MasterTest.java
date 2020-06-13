@@ -2,21 +2,10 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 import org.junit.Test;
 
-public class MasterTest {
+import java.util.Iterator;
+import java.util.List;
 
-    public void showWorkerRange(ZooKeeper zk) throws KeeperException, InterruptedException {
-        Integer keyStart = null;
-        Integer keyEnd = null;
-        for (String w : zk.getChildren("/workers", false)) {
-            byte data[] = zk.getData("/workers/" + w, false, null);
-            String state = new String(data);
-            keyStart = Integer.valueOf(state.split("/")[0]);
-            keyEnd = Integer.valueOf(state.split("/")[1]);
-            Integer range = keyEnd > keyStart ? (keyEnd - keyStart) : Integer.MAX_VALUE - keyEnd + keyStart;
-            double portion = range / (Integer.MAX_VALUE + 0.0) / 2;
-            System.out.println("\t" + w + " keyrange" + String.valueOf(portion));
-        }
-    }
+public class MasterTest {
 
     @Test
     public void hashWorkers() throws Exception, MWException {
@@ -26,7 +15,7 @@ public class MasterTest {
                     () ->
                     {
                         try {
-                            String worker2args[] = {Config.zookeeperHost, finalI.toString()};
+                            String worker2args[] = {Config.zookeeperHost, finalI.toString(),"1220"+finalI.toString()};
                             Worker.main(worker2args);//worker 2
                         } catch (Exception e) {
                             e.printStackTrace();
@@ -41,8 +30,15 @@ public class MasterTest {
         if (m.isLeader) {
             m.boostrap();
             Thread.sleep(600);
-            m.InitialhashWorkers();
-            showWorkerRange(m.zk);
+            m.InitialhashWorkers(); ;
+            Iterator iterator =  m.workerkeymap.keySet().iterator();
+            while (iterator.hasNext()) {
+                String workerkey = (String) iterator.next();
+                // System.out.println(key);
+                List<String> list= (List<String>)m.workerkeymap.get(workerkey);
+                System.out.println(list.get(0)+"-"+list.get(1));
+                // else if((hashvalue >= keyEnd || hashvalue<keyStart)&& k
+            }
         } else {
             System.out.println("Some one else is the leader.");
         }

@@ -7,7 +7,7 @@ import java.io.*;
 import java.util.HashMap;
 
 
-enum RingoDB implements DB {
+public enum RingoDB implements DB {
     INSTANCE;
 
     private static final Logger LOG = LoggerFactory.getLogger(RingoDB.class);
@@ -16,7 +16,7 @@ enum RingoDB implements DB {
     String SNAPSHOT_DIR = "./";
 
     @Override
-    public void Put(String key, String value) throws RingoDBException, UnsupportedEncodingException {
+    public void Put(String key, String value) throws RingoDBException {
         checkKey(key);
         map.put(key, value);
     }

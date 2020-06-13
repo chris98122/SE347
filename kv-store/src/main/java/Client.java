@@ -61,16 +61,19 @@ public class Client implements Watcher {
     public MasterService MasterConnection() {
         Stat stat = new Stat();
         byte data[];
-        while (true) {
+        Boolean trying = true;
+        while (trying) {
             try {
                 data = zk.getData("/master", false, stat);
+                trying = false;
+                masterip = new String(data);
+                System.out.println(new String(data));
                 break;
             } catch (KeeperException | InterruptedException e) {
-                // just retry
+
+                LOG.info("retry get master ip");
             }
         }
-        masterip = new String(data);
-        System.out.println(new String(data));
 
         ConsumerConfig<MasterService> consumerConfig = new ConsumerConfig<MasterService>()
                 .setInterfaceId(MasterService.class.getName()) // 指定接口
@@ -90,7 +93,7 @@ public class Client implements Watcher {
     }
 
     void run() throws KeeperException, InterruptedException {
-        MasterService kvService = MasterConnection();
+        MasterService masterService = MasterConnection();
         Scanner scanner = new Scanner(System.in);
         String key = null, value = null;
         System.out.println("please enter PUT or GET or DELETE or QUIT");
@@ -118,7 +121,7 @@ public class Client implements Watcher {
                             {
                                 countOfRequest.incrementAndGet();
                                 try {
-                                    System.out.println(kvService.PUT(finalKey, finalValue));
+                                    System.out.println(masterService.PUT(finalKey, finalValue));
                                 } catch (SofaRpcException e) {
                                     System.out.println(e);
                                 } finally {
@@ -134,7 +137,7 @@ public class Client implements Watcher {
                             {
                                 countOfRequest.incrementAndGet();
                                 try {
-                                    System.out.println(kvService.GET(finalKey1));
+                                    System.out.println(masterService.GET(finalKey1));
                                 } catch (SofaRpcException e) {
                                     System.out.println(e);
                                 } finally {
@@ -150,7 +153,7 @@ public class Client implements Watcher {
                             {
                                 countOfRequest.incrementAndGet();
                                 try {
-                                    System.out.println(kvService.DELETE(finalKey2));
+                                    System.out.println(masterService.DELETE(finalKey2));
                                 } catch (SofaRpcException e) {
                                     System.out.println(e);
                                 } finally {

@@ -1,3 +1,5 @@
+import DB.RingoDB;
+import DB.RingoDBException;
 import com.alipay.sofa.rpc.config.ProviderConfig;
 import com.alipay.sofa.rpc.config.ServerConfig;
 import lib.WorkerService;
@@ -56,23 +58,46 @@ public class Worker implements Watcher, WorkerService {
 
     @Override
     public String SetKeyRange(String keystart, String keyend) {
-        return keystart + " " + keyend;
+        if (this.KeyStart == null && this.KeyEnd == null) {
+            this.KeyStart = keystart;
+            this.KeyEnd = keyend;
+            return "OK";
+        }
+        return "ERR";
     }
 
     @Override
     public String PUT(String key, String value) {
-        System.out.println("put" + key + value);
-        return "put" + key + value;
+        try {
+            RingoDB.INSTANCE.Put(key, value);
+            LOG.info("put" + key + ":" + value);
+            return "OK";
+        } catch (RingoDBException e) {
+            e.printStackTrace();
+        }
+        return "ERR";
     }
 
     @Override
     public String GET(String key) {
-        return "GET" + key;
+        try {
+            String res = RingoDB.INSTANCE.Get(key);
+            return res;
+        } catch (RingoDBException e) {
+            e.printStackTrace();
+        }
+        return "ERR";
     }
 
     @Override
     public String DELETE(String key) {
-        return "delete" + key;
+        try {
+            RingoDB.INSTANCE.Delete(key);
+            return "OK";
+        } catch (RingoDBException e) {
+            e.printStackTrace();
+        }
+        return "ERR";
     }
 
     void registerRPCServices() {
