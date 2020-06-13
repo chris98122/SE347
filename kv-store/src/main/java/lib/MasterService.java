@@ -1,6 +1,6 @@
 package lib;
 
-public interface KVService {
+public interface MasterService {
     // for communication between Master and Client
     // should be registeed in Master.java
     String PUT(String key, String value);

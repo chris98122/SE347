@@ -1,9 +1,9 @@
 import com.alipay.sofa.rpc.config.ConsumerConfig;
 import com.alipay.sofa.rpc.config.ProviderConfig;
 import com.alipay.sofa.rpc.config.ServerConfig;
-import lib.KVService;
-import lib.KVimplement;
-import lib.MWService;
+import com.alipay.sofa.rpc.core.exception.SofaRpcException;
+import lib.MasterService;
+import lib.WorkerService;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.Stat;
@@ -19,8 +19,7 @@ import java.util.TreeMap;
 
 import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
 
-public class Master<PAIR> implements Watcher {
-
+public class Master<PAIR> implements Watcher, MasterService {
     private static final Logger LOG = LoggerFactory.getLogger(Master.class);
     static String serverId;
     static Boolean isLeader;
@@ -29,7 +28,6 @@ public class Master<PAIR> implements Watcher {
     TreeMap<Integer, String> workermap = new TreeMap<>();// helper structure for calculating workerkeymap
     TreeMap<String, List<String>> workerkeymap = new TreeMap<>();
     TreeMap<String, String> workerstate = new TreeMap<>();
-
     AsyncCallback.StringCallback createParentCallback = new AsyncCallback.StringCallback() {
         @Override
         public void processResult(int rc, String path, Object ctx, String name) {
@@ -121,6 +119,24 @@ public class Master<PAIR> implements Watcher {
         //  m.stopZK();
     }
 
+    @Override
+    public String PUT(String key, String value) {
+
+        return "put" + key + value;
+    }
+
+    @Override
+    public String GET(String key) {
+        System.out.println("GET" + key);
+        return "GET" + key;
+    }
+
+    @Override
+    public String DELETE(String key) {
+        System.out.println("delete" + key);
+        return "delete" + key;
+    }
+
     void reassignAndSet(List<String> children) {
         // reassign worker keyrange
     }
@@ -184,19 +200,23 @@ public class Master<PAIR> implements Watcher {
             // System.out.println(key);
             String workerip = key.split(":")[0];
             String workerport = key.split(":")[1];
-            MWService mvService = GetServiceByWorkerIP(workerip, workerport);
-            LOG.info("[RPC RESPONSE]" + mvService.SetKeyRange(workerkeymap.get(key).get(0), workerkeymap.get(key).get(1)));
+            WorkerService mvService = GetServiceByWorkerIP(workerip, workerport);
+            try {
+                LOG.info("[RPC RESPONSE]" + mvService.SetKeyRange(workerkeymap.get(key).get(0), workerkeymap.get(key).get(1)));
+            } catch (SofaRpcException e) {
+                LOG.error(String.valueOf(e));
+            }
         }
     }
 
-    MWService GetServiceByWorkerIP(String workerip, String port) {
-        ConsumerConfig<MWService> consumerConfig = new ConsumerConfig<MWService>()
-                .setInterfaceId(MWService.class.getName()) // 指定接口
+    WorkerService GetServiceByWorkerIP(String workerip, String port) {
+        ConsumerConfig<WorkerService> consumerConfig = new ConsumerConfig<WorkerService>()
+                .setInterfaceId(WorkerService.class.getName()) // 指定接口
                 .setProtocol("bolt") // 指定协议
                 .setDirectUrl("bolt://" + workerip + ":" + port) // 指定直连地址
                 .setTimeout(2000);
         // 生成代理类
-        MWService mvService = consumerConfig.refer();
+        WorkerService mvService = consumerConfig.refer();
         return mvService;
     }
 
@@ -214,9 +234,9 @@ public class Master<PAIR> implements Watcher {
                 .setPort(12200) // 设置一个端口，默认12200
                 .setDaemon(false); // 非守护线程
 
-        ProviderConfig<KVService> providerConfig = new ProviderConfig<KVService>()
-                .setInterfaceId(KVService.class.getName()) // 指定接口
-                .setRef(new KVimplement()) // 指定实现
+        ProviderConfig<MasterService> providerConfig = new ProviderConfig<MasterService>()
+                .setInterfaceId(MasterService.class.getName()) // 指定接口
+                .setRef(this) // 指定实现
                 .setServer(serverConfig); // 指定服务端
 
         providerConfig.export(); // 发布服务

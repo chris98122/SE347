@@ -1,6 +1,6 @@
 import com.alipay.sofa.rpc.config.ConsumerConfig;
 import com.alipay.sofa.rpc.core.exception.SofaRpcException;
-import lib.KVService;
+import lib.MasterService;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
@@ -58,7 +58,7 @@ public class Client implements Watcher {
         System.out.println(e);
     }
 
-    public KVService MasterConnection() {
+    public MasterService MasterConnection() {
         Stat stat = new Stat();
         byte data[];
         while (true) {
@@ -72,13 +72,13 @@ public class Client implements Watcher {
         masterip = new String(data);
         System.out.println(new String(data));
 
-        ConsumerConfig<KVService> consumerConfig = new ConsumerConfig<KVService>()
-                .setInterfaceId(KVService.class.getName()) // 指定接口
+        ConsumerConfig<MasterService> consumerConfig = new ConsumerConfig<MasterService>()
+                .setInterfaceId(MasterService.class.getName()) // 指定接口
                 .setProtocol("bolt") // 指定协议
                 .setDirectUrl("bolt://" + masterip + ":12200") // 指定直连地址
                 .setTimeout(2000);
         // 生成代理类
-        KVService kvService = consumerConfig.refer();
+        MasterService kvService = consumerConfig.refer();
         return kvService;
     }
 
@@ -90,7 +90,7 @@ public class Client implements Watcher {
     }
 
     void run() throws KeeperException, InterruptedException {
-        KVService kvService = MasterConnection();
+        MasterService kvService = MasterConnection();
         Scanner scanner = new Scanner(System.in);
         String key = null, value = null;
         System.out.println("please enter PUT or GET or DELETE or QUIT");

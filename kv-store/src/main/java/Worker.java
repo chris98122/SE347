@@ -1,14 +1,13 @@
 import com.alipay.sofa.rpc.config.ProviderConfig;
 import com.alipay.sofa.rpc.config.ServerConfig;
-import lib.MWImplement;
-import lib.MWService;
+import lib.WorkerService;
 import org.apache.zookeeper.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.UnknownHostException;
 
-public class Worker implements Watcher {
+public class Worker implements Watcher, WorkerService {
     private static final Logger LOG = LoggerFactory.getLogger(Worker.class);
     private final String WorkerPort;
     ZooKeeper zk;
@@ -54,15 +53,36 @@ public class Worker implements Watcher {
 
     }
 
+    @Override
+    public String SetKeyRange(String keystart, String keyend) {
+        return keystart + " " + keyend;
+    }
+
+    @Override
+    public String PUT(String key, String value) {
+        System.out.println("put" + key + value);
+        return "put" + key + value;
+    }
+
+    @Override
+    public String GET(String key) {
+        return "GET" + key;
+    }
+
+    @Override
+    public String DELETE(String key) {
+        return "delete" + key;
+    }
+
     void registerRPCServices() {
         ServerConfig serverConfig = new ServerConfig()
                 .setProtocol("bolt") // 设置一个协议，默认bolt
                 .setPort(Integer.parseInt(WorkerPort)) // 设置一个端口，即args[2]
                 .setDaemon(false); // 非守护线程
 
-        ProviderConfig<MWService> providerConfig = new ProviderConfig<MWService>()
-                .setInterfaceId(MWService.class.getName()) // 指定接口
-                .setRef(new MWImplement()) // 指定实现
+        ProviderConfig<WorkerService> providerConfig = new ProviderConfig<WorkerService>()
+                .setInterfaceId(WorkerService.class.getName()) // 指定接口
+                .setRef(this)  // 指定实现
                 .setServer(serverConfig); // 指定服务端
 
         providerConfig.export(); // 发布服务
@@ -83,4 +103,5 @@ public class Worker implements Watcher {
     void registerToZookeeper() {
         zk.create("/workers/" + serverId, "UnHashed".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, createWorkerCallback, null);
     }
+
 }
