@@ -42,4 +42,13 @@ public class ClientTest {
         assertEquals("OK", masterService.PUT("null", null));
         assertEquals(null, masterService.GET("null"));
     }
+    @Test
+    public void deleteTest() throws Exception {
+        Client client = new Client(Config.zookeeperHost);
+        client.startZK();
+        MasterService masterService = client.MasterConnection();
+        assertEquals("OK", masterService.DELETE("ringo"));
+        assertEquals("OK", masterService.DELETE("null" ));
+        assertEquals("NO KEY", masterService.GET("ringo" ));
+    }
 }

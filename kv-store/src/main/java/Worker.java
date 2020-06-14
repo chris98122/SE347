@@ -89,6 +89,9 @@ public class Worker implements Watcher, WorkerService {
             return res;
         } catch (RingoDBException e) {
             e.printStackTrace();
+            if (e.getMessage().equals("key not exists")) {
+                return "NO KEY";
+            }
         }
         return "ERR";
     }
@@ -100,6 +103,9 @@ public class Worker implements Watcher, WorkerService {
             return "OK";
         } catch (RingoDBException e) {
             e.printStackTrace();
+            if (e.getMessage().equals("key not exists")) {
+                return "NO KEY";
+            }
         }
         return "ERR";
     }

@@ -24,13 +24,22 @@ public enum RingoDB implements DB {
     @Override
     public String Get(String key) throws RingoDBException {
         checkKey(key);
+        checkKeyExists(key);
         return map.get(key);
     }
 
     @Override
     public void Delete(String key) throws RingoDBException {
         checkKey(key);
+        checkKeyExists(key);
         map.remove(key);
+    }
+
+    void checkKeyExists(String key) throws RingoDBException {
+        if (!map.containsKey(key)) {
+            //key 不存在
+            throw new RingoDBException("key not exists");
+        }
     }
 
     String generate_snapshot_name() {
