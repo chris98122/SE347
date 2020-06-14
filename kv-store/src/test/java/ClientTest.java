@@ -42,13 +42,26 @@ public class ClientTest {
         assertEquals("OK", masterService.PUT("null", null));
         assertEquals(null, masterService.GET("null"));
     }
+
     @Test
     public void deleteTest() throws Exception {
         Client client = new Client(Config.zookeeperHost);
         client.startZK();
         MasterService masterService = client.MasterConnection();
+        assertEquals("OK", masterService.PUT("ringo", "apple"));
+        assertEquals("OK", masterService.PUT("null", null));
         assertEquals("OK", masterService.DELETE("ringo"));
-        assertEquals("OK", masterService.DELETE("null" ));
-        assertEquals("NO KEY", masterService.GET("ringo" ));
+        assertEquals("OK", masterService.DELETE("null"));
+        assertEquals("NO KEY", masterService.GET("ringo"));
+        assertEquals("NO KEY", masterService.GET("null"));
+    }
+
+    @Test
+    public void DispathchToWorkersTest() throws Exception {
+        Client client = new Client(Config.zookeeperHost);
+        client.startZK();
+        MasterService masterService = client.MasterConnection();
+        assertEquals("OK", masterService.PUT("apple", "ringo"));
+        assertEquals("OK", masterService.PUT("ringo", "apple"));
     }
 }

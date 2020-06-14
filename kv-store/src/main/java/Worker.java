@@ -74,7 +74,7 @@ public class Worker implements Watcher, WorkerService {
     public String PUT(String key, String value) {
         try {
             RingoDB.INSTANCE.Put(key, value);
-            LOG.info("put" + key + ":" + value);
+            LOG.info("[DB EXECUTION]put" + key + ":" + value);
             return "OK";
         } catch (RingoDBException e) {
             e.printStackTrace();
@@ -86,6 +86,7 @@ public class Worker implements Watcher, WorkerService {
     public String GET(String key) {
         try {
             String res = RingoDB.INSTANCE.Get(key);
+            LOG.info("[DB EXECUTION] GET" + key + "value:" + res);
             return res;
         } catch (RingoDBException e) {
             e.printStackTrace();
@@ -100,6 +101,7 @@ public class Worker implements Watcher, WorkerService {
     public String DELETE(String key) {
         try {
             RingoDB.INSTANCE.Delete(key);
+            LOG.info("[DB EXECUTION] delete" + key);
             return "OK";
         } catch (RingoDBException e) {
             e.printStackTrace();

@@ -46,23 +46,6 @@ public class Master<PAIR> implements Watcher, MasterService {
             }
         }
     };
-    //主节点等待从节点的变化（包括worker node fail 或者 增加）
-    //ZooKeeper客户端也可以通过getData，getChildren和exist三个接口来向ZooKeeper服务器注册Watcher
-    Watcher workersChangeWatcher = new Watcher() {
-        public void process(WatchedEvent e) {
-            if (e.getType() == Event.EventType.NodeChildrenChanged) {
-                assert ("/workers".equals(e.getPath()));
-                try {
-                    getWorkers();
-                } catch (KeeperException keeperException) {
-                    keeperException.printStackTrace();
-                } catch (InterruptedException interruptedException) {
-                    interruptedException.printStackTrace();
-                }
-            }
-        }
-
-    };
     AsyncCallback.ChildrenCallback workerGetChildrenCallback = new AsyncCallback.ChildrenCallback() {
         @Override
         public void processResult(int rc, String path, Object ctx, List<String> children) {
@@ -82,6 +65,23 @@ public class Master<PAIR> implements Watcher, MasterService {
                     break;
                 default:
                     LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
+            }
+        }
+
+    };
+    //主节点等待从节点的变化（包括worker node fail 或者 增加）
+    //ZooKeeper客户端也可以通过getData，getChildren和exist三个接口来向ZooKeeper服务器注册Watcher
+    Watcher workersChangeWatcher = new Watcher() {
+        public void process(WatchedEvent e) {
+            if (e.getType() == Event.EventType.NodeChildrenChanged) {
+                assert ("/workers".equals(e.getPath()));
+                try {
+                    getWorkers();
+                } catch (KeeperException keeperException) {
+                    keeperException.printStackTrace();
+                } catch (InterruptedException interruptedException) {
+                    interruptedException.printStackTrace();
+                }
             }
         }
 
@@ -117,6 +117,13 @@ public class Master<PAIR> implements Watcher, MasterService {
             System.out.println("Some one else is the leader.");
         }
         //  m.stopZK();
+    }
+
+    public static Integer Hash(String string) {
+        //加密后的字符串
+        String encodeStr = DigestUtils.md5Hex(string);
+        //System.out.println("MD5加密后的字符串为:encodeStr="+encodeStr);
+        return encodeStr.hashCode();
     }
 
     @Override
@@ -166,13 +173,6 @@ public class Master<PAIR> implements Watcher, MasterService {
         zk.getChildren("/workers", workersChangeWatcher, workerGetChildrenCallback, null);
     }
 
-    Integer Hash(String workerstring) {
-        //加密后的字符串
-        String encodeStr = DigestUtils.md5Hex(workerstring);
-        //System.out.println("MD5加密后的字符串为:encodeStr="+encodeStr);
-        return encodeStr.hashCode();
-    }
-
     String getWorkerADDR(String keyString) {
         Integer hashvalue = Hash(keyString);
         Iterator iterator = workerkeymap.keySet().iterator();
@@ -182,9 +182,15 @@ public class Master<PAIR> implements Watcher, MasterService {
             Integer keyStart = Integer.valueOf(workerkeymap.get(workerkey).get(0));
             Integer keyEnd = Integer.valueOf(workerkeymap.get(workerkey).get(1));
             if (hashvalue >= keyStart && hashvalue < keyEnd) {
-                return workerkey;
-            } else if ((hashvalue >= keyEnd || hashvalue < keyStart) && keyStart > keyEnd) {
-                return workerkey;
+                {
+                    LOG.info(hashvalue + " >= " + keyStart + " and < " + keyEnd);
+                    return workerkey;
+                }
+            } else if ((hashvalue < keyEnd | hashvalue >= keyStart) && keyStart > keyEnd) {
+                {
+                    LOG.info(hashvalue + " >= " + keyStart + " or < " + keyEnd);
+                    return workerkey;
+                }
             }
         }
         return "ERR";
