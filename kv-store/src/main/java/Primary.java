@@ -34,7 +34,9 @@ public class Primary implements Watcher, PrimaryService {
 
     HashMap<String, ConsumerConfig<WorkerService>> workerConsumerConfigHashMap = new HashMap<String, ConsumerConfig<WorkerService>>();
     // stores workerAddr -->ConsumerConfig mapping
+    HashMap<String, Boolean> workerState = new HashMap<>();
 
+    List<String> workerlist = null;
     AsyncCallback.StringCallback createParentCallback = new AsyncCallback.StringCallback() {
         @Override
         public void processResult(int rc, String path, Object ctx, String name) {
@@ -83,53 +85,17 @@ public class Primary implements Watcher, PrimaryService {
         public void process(WatchedEvent e) {
             if (e.getType() == Event.EventType.NodeChildrenChanged) {
                 assert ("/workers".equals(e.getPath()));
-                LOG.info("/workers changes");
+                LOG.info("workersChangeWatcher triggered");
                 try {
+                    /*如果在重新注册watcher的时间里发生了"/worker"的变化
+                    1. worker fail ：之后讨论
+                    2. new worker add :解决方法是new worker 60秒内都没有收到setKeyRange()就打个LOG然后等运维手动重启
+                    */
                     getWorkers();//watcher是一次性的所以必须再次注册
                     //客户端 Watcher 回调的过程是一个串行同步的过程，所以另开线程处理
-
-
-                    // 目前假设只有scale out 没有worker fail
-                    Thread scaleOut = new Thread(() -> {
-                        List<String> workerlist = null;//sync call
-
-                        try {
-                            workerlist = zk.getChildren("/workers", null);
-
-                        } catch (KeeperException keeperException) {
-                            keeperException.printStackTrace();
-                        } catch (InterruptedException interruptedException) {
-                            interruptedException.printStackTrace();
-                        }
-                        for (String workerReceiver : workerlist) {
-                            if (!workerConsumerConfigHashMap.containsKey(workerReceiver)) {
-                                //workerConsumerConfigHashMap add workerReceiver in GetServiceByWorkerADDR()
-                                WorkerService workerReiverService = GetServiceByWorkerADDR(workerReceiver);
-
-
-                                // it's a new worker
-                                // find the worker just like the way put(key,value)  did
-                                String workerSenderAddr = getWorkerADDR(workerReceiver);
-
-                                // tell the workerReceiver to register as RPC Server
-                                // (RPCport for data treansfer is 200+WorkerPort)
-                                // reuse the SetKeyRange interface
-
-
-                                workerReiverService.SetKeyRange(Hash(workerReceiver).toString(), workerkeymap.get(workerSenderAddr).get(1), true);
-
-                                // notify the workerSender's to reset keyrange
-                                // workerSender do datatransfer
-                                // reset workerkeymap
-                                String newKeyEnd = Hash(workerReceiver).toString();
-                                resetKeyRange(newKeyEnd, workerSenderAddr);
-                                // if there are more new workers , have to wait til the former one is all set up.
-
-                            }
-                        }
-                    });
-                    scaleOut.start();
-
+                    ProcessWorkerChange processWorkerChange = new ProcessWorkerChange();
+                    processWorkerChange.setName("processWorkerChange");
+                    processWorkerChange.start();
                 } catch (KeeperException keeperException) {
                     keeperException.printStackTrace();
                 } catch (InterruptedException interruptedException) {
@@ -148,7 +114,7 @@ public class Primary implements Watcher, PrimaryService {
     }
 
     public static void main(String args[])
-            throws Exception, MWException {
+            throws Exception {
         Primary m = new Primary(args[0]);
         m.startZK();
         m.runForPrimary();
@@ -165,6 +131,8 @@ public class Primary implements Watcher, PrimaryService {
             } catch (MWException e) {
                 e.printStackTrace();
                 System.out.println(e.getMessage());
+                m.getWorkers();//register the "/worker"" Watcher
+
             }
         } else {
             System.out.println("Some one else is the leader.");
@@ -259,10 +227,8 @@ public class Primary implements Watcher, PrimaryService {
         for (String w : zk.getChildren("/workers", false)) {
             byte data[] = zk.getData("/workers/" + w, false, null);
             //System.out.println(w);
-            String workerstate = new String(data);
-            if (workerstate.equals("UnHashed")) {// workerstate stored in znode seems useless, may delete this afterwards
-                workermap.put(Hash(w), w);
-            }
+            workermap.put(Hash(w), w);
+            workerState.put(w, true);// mark workers as active
         }
         if (workermap.isEmpty()) {
             throw new MWException("workers not exist");
@@ -301,7 +267,9 @@ public class Primary implements Watcher, PrimaryService {
                     .setInterfaceId(WorkerService.class.getName()) // 指定接口
                     .setProtocol("bolt") // 指定协议
                     .setDirectUrl("bolt://" + workerip + ":" + workerport) // 指定直连地址
-                    .setTimeout(2000);
+                    .setTimeout(2000)
+                    .setRepeatedReferLimit(30); //允许同一interface，同一uniqueId，不同server情况refer 30次，用于单机调试
+
             workerConsumerConfigHashMap.put(WorkerAddr, consumerConfig);
         } else {
             consumerConfig = workerConsumerConfigHashMap.get(WorkerAddr);
@@ -313,8 +281,7 @@ public class Primary implements Watcher, PrimaryService {
 
     void run() throws InterruptedException {
         while (true) {
-
-            Thread.sleep(600);
+            Thread.sleep(60);
         }
     }
 
@@ -340,7 +307,6 @@ public class Primary implements Watcher, PrimaryService {
             e.printStackTrace();
         }
     }
-
 
     boolean checkPrimary() {
         while (true) {
@@ -394,6 +360,77 @@ public class Primary implements Watcher, PrimaryService {
 
     public void process(WatchedEvent e) {
         System.out.println(e);
+    }
+
+    // last get workerlist
+    class ProcessWorkerChange extends Thread {
+        public void run() {
+            try {
+                workerlist = zk.getChildren("/workers", null);//sync call
+            } catch (KeeperException | InterruptedException keeperException) {
+                keeperException.printStackTrace();
+            }
+            Integer newWorkerNum = 0;
+            // check if worker fail
+            for (String worker : workerlist) {
+                if (workerState.containsKey(worker)) {
+                    workerState.put(worker, false);// flip the state
+                } else {
+                    // ScaleOut needed
+                    newWorkerNum++;
+                }
+            }
+            for (Map.Entry<String, Boolean> entry : workerState.entrySet()) {
+                if (!entry.getValue()) {
+                    //flip back;
+                    workerState.put(entry.getKey(), true);
+                } else {
+                    LOG.warn("worker " + entry.getKey() + " failed");
+                }
+            }
+            if (newWorkerNum >= 1) {
+                LOG.info(newWorkerNum + " new workers");
+                // ScaleOutProcess.start();
+                ScaleOut scaleOut = new ScaleOut();
+                scaleOut.setName("processWorkerChange");
+                scaleOut.start();
+            }
+        }
+
+    }
+
+    class ScaleOut extends Thread {       /*
+                        如果在注册后立马有新的workersChangeWatcher回调
+                        需要保证ScaleOut线程一个时间只运行一个
+                        而且对workerConsumerConfigHashMap等map的操作也保证是线程安全的
+                    */
+        public void run() {
+            synchronized (workerConsumerConfigHashMap) {
+                for (String workerReceiver : workerlist) {
+                    if (!workerConsumerConfigHashMap.containsKey(workerReceiver)) {
+                        //workerConsumerConfigHashMap add workerReceiver in GetServiceByWorkerADDR()
+                        WorkerService workerReiverService = GetServiceByWorkerADDR(workerReceiver);
+                        // it's a new worker
+                        // find the worker just like the way put(key,value)  did
+                        String workerSenderAddr = getWorkerADDR(workerReceiver);
+
+                        // tell the workerReceiver to register as RPC Server
+                        // (RPCport for data treansfer is 200+WorkerPort)
+                        // reuse the SetKeyRange interface
+                        workerReiverService.SetKeyRange(Hash(workerReceiver).toString(), workerkeymap.get(workerSenderAddr).get(1), true);
+
+                        // notify the workerSender's to reset keyrange
+                        // workerSender do datatransfer
+                        // reset workerkeymap
+                        String newKeyEnd = Hash(workerReceiver).toString();
+                        resetKeyRange(newKeyEnd, workerSenderAddr);
+                        // if there are more new workers , have to wait til the former one is all set up,
+                        // 缺点是可能会a->b->c传两遍数据
+                        workerState.put(workerReceiver, true);
+                    }
+                }
+            }
+        }
     }
 
 }

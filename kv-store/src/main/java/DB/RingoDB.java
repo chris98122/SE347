@@ -16,20 +16,20 @@ public enum RingoDB implements DB {
     String SNAPSHOT_DIR = "./";
 
     @Override
-    public void Put(String key, String value) throws RingoDBException {
+    public synchronized void Put(String key, String value) throws RingoDBException {
         checkKey(key);
         map.put(key, value);
     }
 
     @Override
-    public String Get(String key) throws RingoDBException {
+    public synchronized String Get(String key) throws RingoDBException {
         checkKey(key);
         checkKeyExists(key);
         return map.get(key);
     }
 
     @Override
-    public void Delete(String key) throws RingoDBException {
+    public synchronized void Delete(String key) throws RingoDBException {
         checkKey(key);
         checkKeyExists(key);
         map.remove(key);

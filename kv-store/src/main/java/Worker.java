@@ -118,15 +118,16 @@ public class Worker implements Watcher, WorkerService {
     }
 
     void registerRPCServices() {
-        ServerConfig serverConfig = new ServerConfig()
+        ServerConfig serverConfig = (ServerConfig) new ServerConfig()
                 .setProtocol("bolt") // 设置一个协议，默认bolt
                 .setPort(Integer.parseInt(WorkerPort)) // 设置一个端口，即args[2]
-                .setDaemon(false); // 非守护线程
+                .setDaemon(true); // 守护线程
 
         ProviderConfig<WorkerService> providerConfig = new ProviderConfig<WorkerService>()
                 .setInterfaceId(WorkerService.class.getName()) // 指定接口
                 .setRef(this)  // 指定实现
-                .setServer(serverConfig); // 指定服务端
+                .setServer(serverConfig)// 指定服务端
+                .setRepeatedExportLimit(30); //允许同一interface，同一uniqueId，不同server情况发布30次，用于单机调试
 
         providerConfig.export(); // 发布服务
     }
@@ -134,6 +135,7 @@ public class Worker implements Watcher, WorkerService {
     void startZK() {
         try {
             zk = new ZooKeeper(hostPort, 15000, this);
+
         } catch (java.io.IOException e) {
             e.printStackTrace();
         }
