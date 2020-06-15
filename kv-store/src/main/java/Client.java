@@ -1,6 +1,6 @@
 import com.alipay.sofa.rpc.config.ConsumerConfig;
 import com.alipay.sofa.rpc.core.exception.SofaRpcException;
-import lib.MasterService;
+import lib.PrimaryService;
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -75,17 +75,17 @@ public class Client implements Watcher {
         System.out.println(e);
     }
 
-    public MasterService MasterConnection() {
-        zk.getData("/master", false, readmasterCallback, null);
+    public PrimaryService PrimaryConnection() {
+        zk.getData("/primary", false, readmasterCallback, null);
 
-        ConsumerConfig<MasterService> consumerConfig = new ConsumerConfig<MasterService>()
-                .setInterfaceId(MasterService.class.getName()) // 指定接口
+        ConsumerConfig<PrimaryService> consumerConfig = new ConsumerConfig<PrimaryService>()
+                .setInterfaceId(PrimaryService.class.getName()) // 指定接口
                 .setProtocol("bolt") // 指定协议
                 .setDirectUrl("bolt://" + masterip + ":12200") // 指定直连地址
                 .setTimeout(2000);
         // 生成代理类
-        MasterService kvService = consumerConfig.refer();
-        return kvService;
+        PrimaryService primaryService = consumerConfig.refer();
+        return primaryService;
     }
 
     void quit() throws InterruptedException {
@@ -96,7 +96,7 @@ public class Client implements Watcher {
     }
 
     void run() throws KeeperException, InterruptedException {
-        MasterService masterService = MasterConnection();
+        PrimaryService primaryService = PrimaryConnection();
         Scanner scanner = new Scanner(System.in);
         String key = null, value = null;
         System.out.println("please enter PUT or GET or DELETE or QUIT");
@@ -124,7 +124,7 @@ public class Client implements Watcher {
                             {
                                 countOfRequest.incrementAndGet();
                                 try {
-                                    System.out.println(masterService.PUT(finalKey, finalValue));
+                                    System.out.println(primaryService.PUT(finalKey, finalValue));
                                 } catch (SofaRpcException e) {
                                     System.out.println(e);
                                 } finally {
@@ -140,7 +140,7 @@ public class Client implements Watcher {
                             {
                                 countOfRequest.incrementAndGet();
                                 try {
-                                    System.out.println(masterService.GET(finalKey1));
+                                    System.out.println(primaryService.GET(finalKey1));
                                 } catch (SofaRpcException e) {
                                     System.out.println(e);
                                 } finally {
@@ -156,7 +156,7 @@ public class Client implements Watcher {
                             {
                                 countOfRequest.incrementAndGet();
                                 try {
-                                    System.out.println(masterService.DELETE(finalKey2));
+                                    System.out.println(primaryService.DELETE(finalKey2));
                                 } catch (SofaRpcException e) {
                                     System.out.println(e);
                                 } finally {

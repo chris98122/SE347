@@ -4,7 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.util.HashMap;
+import java.util.TreeMap;
 
 
 public enum RingoDB implements DB {
@@ -12,7 +12,7 @@ public enum RingoDB implements DB {
 
     private static final Logger LOG = LoggerFactory.getLogger(RingoDB.class);
     static Integer snapshot_version = 0;
-    HashMap<String, String> map = new HashMap<String, String>();
+    TreeMap<String, String> map = new TreeMap<String, String>();
     String SNAPSHOT_DIR = "./";
 
     @Override
@@ -104,7 +104,7 @@ public enum RingoDB implements DB {
         // create an ObjectInputStream for the file we created before
         ObjectInputStream ois = new ObjectInputStream(new FileInputStream(get_snapshot_name()));
 
-        HashMap<String, String> m1 = (HashMap<String, String>) ois.readObject();
+        TreeMap<String, String> m1 = (TreeMap<String, String>) ois.readObject();
         if (map.isEmpty()) {
             map = m1;
         } else {

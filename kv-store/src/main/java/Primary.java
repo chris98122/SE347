@@ -2,7 +2,7 @@ import com.alipay.sofa.rpc.config.ConsumerConfig;
 import com.alipay.sofa.rpc.config.ProviderConfig;
 import com.alipay.sofa.rpc.config.ServerConfig;
 import com.alipay.sofa.rpc.core.exception.SofaRpcException;
-import lib.MasterService;
+import lib.PrimaryService;
 import lib.WorkerService;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.zookeeper.*;
@@ -16,16 +16,24 @@ import java.util.*;
 
 import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
 
-public class Master<PAIR> implements Watcher, MasterService {
-    private static final Logger LOG = LoggerFactory.getLogger(Master.class);
+public class Primary implements Watcher, PrimaryService {
+    private static final Logger LOG = LoggerFactory.getLogger(Primary.class);
     static String serverId;
     static Boolean isLeader;
     ZooKeeper zk;
     String hostPort;
-    TreeMap<Integer, String> workermap = new TreeMap<>();// helper structure for calculating workerkeymap
+    TreeMap<Integer, String> workermap = new TreeMap<>();
+    // helper structure for calculating workerkeymap
+    // stores startKey --> workerAddr mapping
+    // e.g -399182218 -->  212.64.64.185:12201
+    // NOT USED SINCE INITIAL HASH WORKERS, MAY CHANGE TO LOCAL VARIABLE
+
     TreeMap<String, List<String>> workerkeymap = new TreeMap<>();
-    TreeMap<String, String> workerstate = new TreeMap<>();
+    // stores workerAddr --> [KeyStart, KeyEnd] mapping
+    // e.g 212.64.64.185:12201  --> [-399182218,1302869320]
+
     HashMap<String, ConsumerConfig<WorkerService>> workerConsumerConfigHashMap = new HashMap<String, ConsumerConfig<WorkerService>>();
+    // stores workerAddr -->ConsumerConfig mapping
 
     AsyncCallback.StringCallback createParentCallback = new AsyncCallback.StringCallback() {
         @Override
@@ -52,6 +60,7 @@ public class Master<PAIR> implements Watcher, MasterService {
             switch (KeeperException.Code.get(rc)) {
                 case CONNECTIONLOSS:
                     try {
+                        LOG.info("retry get workers");
                         getWorkers();
                     } catch (KeeperException e) {
                         e.printStackTrace();
@@ -61,7 +70,6 @@ public class Master<PAIR> implements Watcher, MasterService {
                     break;
                 case OK:
                     LOG.info("Successfully got a list of workers:" + children.size() + "workers");
-                    reassignAndSet(children);
                     break;
                 default:
                     LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
@@ -75,8 +83,53 @@ public class Master<PAIR> implements Watcher, MasterService {
         public void process(WatchedEvent e) {
             if (e.getType() == Event.EventType.NodeChildrenChanged) {
                 assert ("/workers".equals(e.getPath()));
+                LOG.info("/workers changes");
                 try {
-                    getWorkers();
+                    getWorkers();//watcher是一次性的所以必须再次注册
+                    //客户端 Watcher 回调的过程是一个串行同步的过程，所以另开线程处理
+
+
+                    // 目前假设只有scale out 没有worker fail
+                    Thread scaleOut = new Thread(() -> {
+                        List<String> workerlist = null;//sync call
+
+                        try {
+                            workerlist = zk.getChildren("/workers", null);
+
+                        } catch (KeeperException keeperException) {
+                            keeperException.printStackTrace();
+                        } catch (InterruptedException interruptedException) {
+                            interruptedException.printStackTrace();
+                        }
+                        for (String workerReceiver : workerlist) {
+                            if (!workerConsumerConfigHashMap.containsKey(workerReceiver)) {
+                                //workerConsumerConfigHashMap add workerReceiver in GetServiceByWorkerADDR()
+                                WorkerService workerReiverService = GetServiceByWorkerADDR(workerReceiver);
+
+
+                                // it's a new worker
+                                // find the worker just like the way put(key,value)  did
+                                String workerSenderAddr = getWorkerADDR(workerReceiver);
+
+                                // tell the workerReceiver to register as RPC Server
+                                // (RPCport for data treansfer is 200+WorkerPort)
+                                // reuse the SetKeyRange interface
+
+
+                                workerReiverService.SetKeyRange(Hash(workerReceiver).toString(), workerkeymap.get(workerSenderAddr).get(1), true);
+
+                                // notify the workerSender's to reset keyrange
+                                // workerSender do datatransfer
+                                // reset workerkeymap
+                                String newKeyEnd = Hash(workerReceiver).toString();
+                                resetKeyRange(newKeyEnd, workerSenderAddr);
+                                // if there are more new workers , have to wait til the former one is all set up.
+
+                            }
+                        }
+                    });
+                    scaleOut.start();
+
                 } catch (KeeperException keeperException) {
                     keeperException.printStackTrace();
                 } catch (InterruptedException interruptedException) {
@@ -87,7 +140,7 @@ public class Master<PAIR> implements Watcher, MasterService {
 
     };
 
-    Master(String hostPort) throws UnknownHostException {
+    Primary(String hostPort) throws UnknownHostException {
         this.hostPort = hostPort;
         InetAddress addr = InetAddress.getLocalHost();
         serverId = addr.getHostAddress();
@@ -96,9 +149,9 @@ public class Master<PAIR> implements Watcher, MasterService {
 
     public static void main(String args[])
             throws Exception, MWException {
-        Master m = new Master(args[0]);
+        Primary m = new Primary(args[0]);
         m.startZK();
-        m.runForMaster();
+        m.runForPrimary();
         if (m.isLeader) {
             try {
                 System.out.println("I'm the leader.");
@@ -165,12 +218,14 @@ public class Master<PAIR> implements Watcher, MasterService {
         return "ERR";
     }
 
-    void reassignAndSet(List<String> children) {
+    void resetKeyRange(String newKeyEnd, String workerAddr) {
+        // block until the data transfer is done
         // reassign worker keyrange
     }
 
     public void getWorkers() throws KeeperException, InterruptedException {
         zk.getChildren("/workers", workersChangeWatcher, workerGetChildrenCallback, null);
+        // register the workersChangeWatcher
     }
 
     String getWorkerADDR(String keyString) {
@@ -194,10 +249,6 @@ public class Master<PAIR> implements Watcher, MasterService {
             }
         }
         return "ERR";
-    }
-
-    void resetkeyrange() {
-
     }
 
     void InitialhashWorkers() throws KeeperException, InterruptedException, MWException {
@@ -234,7 +285,7 @@ public class Master<PAIR> implements Watcher, MasterService {
             String workerAddr = (String) iterator.next();
             WorkerService workerService = GetServiceByWorkerADDR(workerAddr);
             try {
-                LOG.info("[RPC RESPONSE]" + workerService.SetKeyRange(workerkeymap.get(workerAddr).get(0), workerkeymap.get(workerAddr).get(1)));
+                LOG.info("[RPC RESPONSE]" + workerService.SetKeyRange(workerkeymap.get(workerAddr).get(0), workerkeymap.get(workerAddr).get(1), false));
             } catch (SofaRpcException e) {
                 LOG.error(String.valueOf(e));
             }
@@ -274,8 +325,8 @@ public class Master<PAIR> implements Watcher, MasterService {
                 .setPort(12200) // 设置一个端口，默认12200
                 .setDaemon(false); // 非守护线程
 
-        ProviderConfig<MasterService> providerConfig = new ProviderConfig<MasterService>()
-                .setInterfaceId(MasterService.class.getName()) // 指定接口
+        ProviderConfig<PrimaryService> providerConfig = new ProviderConfig<PrimaryService>()
+                .setInterfaceId(PrimaryService.class.getName()) // 指定接口
                 .setRef(this) // 指定实现
                 .setServer(serverConfig); // 指定服务端
 
@@ -291,11 +342,11 @@ public class Master<PAIR> implements Watcher, MasterService {
     }
 
 
-    boolean checkMaster() {
+    boolean checkPrimary() {
         while (true) {
             try {
                 Stat stat = new Stat();
-                byte data[] = zk.getData("/master", false, stat);
+                byte data[] = zk.getData("/primary", false, stat);
                 isLeader = new String(data).equals(serverId);
                 return true;
             } catch (KeeperException.NoNodeException e) {
@@ -309,10 +360,10 @@ public class Master<PAIR> implements Watcher, MasterService {
         }
     }
 
-    void runForMaster() throws InterruptedException {
+    void runForPrimary() throws InterruptedException {
         while (true) {
             try {
-                zk.create("/master", serverId.getBytes(), OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+                zk.create("/primary", serverId.getBytes(), OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
                 // create master znode should use CreateMode.EPHEMERAL
                 // so the znode would be deleted when the connection is lost
                 isLeader = true;
@@ -324,7 +375,7 @@ public class Master<PAIR> implements Watcher, MasterService {
             } catch (KeeperException e) {
                 e.printStackTrace();
             }
-            if (checkMaster()) break;
+            if (checkPrimary()) break;
         }
     }
 

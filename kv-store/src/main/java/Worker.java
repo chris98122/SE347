@@ -57,7 +57,7 @@ public class Worker implements Watcher, WorkerService {
     }
 
     @Override
-    public String SetKeyRange(String keystart, String keyend) {
+    public String SetKeyRange(String keystart, String keyend, boolean dataTranfer) {
         if (this.KeyStart == null && this.KeyEnd == null) {
             this.KeyStart = keystart;
             this.KeyEnd = keyend;
@@ -66,6 +66,11 @@ public class Worker implements Watcher, WorkerService {
         } else if (this.KeyStart.equals(keystart) && this.KeyEnd.equals(keyend)) {
             LOG.info("reset keyrage to same value.");
             return "OK";
+        }
+        if (dataTranfer) {
+            // register as RPC Server
+            // (RPCport for data treansfer is 200+WorkerPort)
+            // reuse the SetKeyRange interface
         }
         return "ERR";
     }

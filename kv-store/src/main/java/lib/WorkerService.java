@@ -3,7 +3,7 @@ package lib;
 public interface WorkerService {
     // for communication between Master and Worker
     //should be registeed in Worker.java
-    String SetKeyRange(String keystart, String keyend);
+    String SetKeyRange(String keystart, String keyend, boolean dataTranfer);
 
     String PUT(String key, String value);
 

@@ -1,4 +1,4 @@
-import lib.MasterService;
+import lib.PrimaryService;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -19,49 +19,49 @@ public class ClientTest {
         Client client = new Client(Config.zookeeperHost);
         client.startZK();
         Thread.sleep(50);
-        MasterService masterService = client.MasterConnection();
-        assertEquals("OK", masterService.PUT("ringo", "apple"));
-        assertEquals("OK", masterService.PUT("ringo", "apple"));
-        assertEquals("OK", masterService.PUT("ringo", "apple"));
+        PrimaryService primaryService = client.PrimaryConnection();
+        assertEquals("OK", primaryService.PUT("ringo", "apple"));
+        assertEquals("OK", primaryService.PUT("ringo", "apple"));
+        assertEquals("OK", primaryService.PUT("ringo", "apple"));
     }
 
     @Test
     public void GETTEST() throws Exception {
         Client client = new Client(Config.zookeeperHost);
         client.startZK();
-        MasterService masterService = client.MasterConnection();
-        assertEquals("OK", masterService.PUT("ringo", "apple"));
-        assertEquals("apple", masterService.GET("ringo"));
+        PrimaryService primaryService = client.PrimaryConnection();
+        assertEquals("OK", primaryService.PUT("ringo", "apple"));
+        assertEquals("apple", primaryService.GET("ringo"));
     }
 
     @Test
     public void nullvalueTest() throws Exception {
         Client client = new Client(Config.zookeeperHost);
         client.startZK();
-        MasterService masterService = client.MasterConnection();
-        assertEquals("OK", masterService.PUT("null", null));
-        assertEquals(null, masterService.GET("null"));
+        PrimaryService primaryService = client.PrimaryConnection();
+        assertEquals("OK", primaryService.PUT("null", null));
+        assertEquals(null, primaryService.GET("null"));
     }
 
     @Test
     public void deleteTest() throws Exception {
         Client client = new Client(Config.zookeeperHost);
         client.startZK();
-        MasterService masterService = client.MasterConnection();
-        assertEquals("OK", masterService.PUT("ringo", "apple"));
-        assertEquals("OK", masterService.PUT("null", null));
-        assertEquals("OK", masterService.DELETE("ringo"));
-        assertEquals("OK", masterService.DELETE("null"));
-        assertEquals("NO KEY", masterService.GET("ringo"));
-        assertEquals("NO KEY", masterService.GET("null"));
+        PrimaryService primaryService = client.PrimaryConnection();
+        assertEquals("OK", primaryService.PUT("ringo", "apple"));
+        assertEquals("OK", primaryService.PUT("null", null));
+        assertEquals("OK", primaryService.DELETE("ringo"));
+        assertEquals("OK", primaryService.DELETE("null"));
+        assertEquals("NO KEY", primaryService.GET("ringo"));
+        assertEquals("NO KEY", primaryService.GET("null"));
     }
 
     @Test
     public void DispathchToWorkersTest() throws Exception {
         Client client = new Client(Config.zookeeperHost);
         client.startZK();
-        MasterService masterService = client.MasterConnection();
-        assertEquals("OK", masterService.PUT("apple", "ringo"));
-        assertEquals("OK", masterService.PUT("ringo", "apple"));
+        PrimaryService primaryService = client.PrimaryConnection();
+        assertEquals("OK", primaryService.PUT("apple", "ringo"));
+        assertEquals("OK", primaryService.PUT("ringo", "apple"));
     }
 }

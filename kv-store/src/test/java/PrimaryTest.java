@@ -3,7 +3,7 @@ import org.junit.Test;
 import java.util.Iterator;
 import java.util.List;
 
-public class MasterTest {
+public class PrimaryTest {
 
     @Test
     public void hashWorkers() throws Exception, MWException {
@@ -22,14 +22,13 @@ public class MasterTest {
             ).start();
         }
         String args[] = {Config.zookeeperHost, "1"};
-        Master m = new Master(args[0]);
+        Primary m = new Primary(args[0]);
         m.startZK();
-        m.runForMaster();
+        m.runForPrimary();
         if (m.isLeader) {
             m.boostrap();
             Thread.sleep(600);
             m.InitialhashWorkers();
-            ;
             Iterator iterator = m.workerkeymap.keySet().iterator();
             while (iterator.hasNext()) {
                 String workerkey = (String) iterator.next();
