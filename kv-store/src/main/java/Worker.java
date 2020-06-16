@@ -2,6 +2,7 @@ import DB.RingoDB;
 import DB.RingoDBException;
 import com.alipay.sofa.rpc.config.ProviderConfig;
 import com.alipay.sofa.rpc.config.ServerConfig;
+import lib.DataTransferService;
 import lib.WorkerService;
 import org.apache.zookeeper.*;
 import org.slf4j.Logger;
@@ -9,7 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.UnknownHostException;
 
-public class Worker implements Watcher, WorkerService {
+public class Worker implements Watcher, WorkerService, DataTransferService {
     private static final Logger LOG = LoggerFactory.getLogger(Worker.class);
     private final String WorkerPort;
     ZooKeeper zk;
@@ -48,12 +49,33 @@ public class Worker implements Watcher, WorkerService {
         Worker w = new Worker(args[0], args[1], args[2]);
         w.startZK();
         w.registerRPCServices();// make sure the RPC can work, then register to zookeeper
-        w.registerToZookeeper();// if the worker is a new one, master should call rpc SetKeyRange
+        w.registerToZookeeper();
+        // if the worker is a new one, master should call rpc SetKeyRange(startKey,endKey,true)
 
         while (true) {
             Thread.sleep(600);
         }
 
+    }
+
+    boolean checkNeedDataTransfer(String start, String end) {
+        try {
+            return RingoDB.INSTANCE.hasValueInRange(start, end);
+        } catch (RingoDBException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public String ResetKeyEnd(String keyend, String WorkerReceiverADRR) {
+        if (checkNeedDataTransfer(keyend, this.KeyEnd)) {
+            LOG.info("do datatransfer");
+        } else {
+            LOG.info("no need for datatransfer");
+            return "OK";
+        }
+        return "ERR";
     }
 
     @Override
@@ -70,10 +92,11 @@ public class Worker implements Watcher, WorkerService {
             return "OK";
         }
         if (dataTranfer) {
-            LOG.info("start data transfer");
             // register as RPC Server
-            // (RPCport for data treansfer is 200+WorkerPort)
-            // reuse the SetKeyRange interface
+            registerDataTransferService();
+            LOG.info("New Worker resgistered data transfer Service");
+            // (RPC port for data transfer is the same as WorkerPort)
+            return "OK";
         }
         return "ERR";
     }
@@ -118,6 +141,22 @@ public class Worker implements Watcher, WorkerService {
             }
         }
         return "ERR";
+    }
+
+    void registerDataTransferService() {
+        LOG.info("registerDataTrensferService");
+        ServerConfig serverConfig = (ServerConfig) new ServerConfig()
+                .setProtocol("bolt") // 设置一个协议，默认bolt
+                .setPort(Integer.parseInt(WorkerPort)) // 设置一个端口，即args[2]
+                .setDaemon(true); // 守护线程
+
+        ProviderConfig<DataTransferService> providerConfig = new ProviderConfig<DataTransferService>()
+                .setInterfaceId(DataTransferService.class.getName()) // 指定接口
+                .setRef(this)  // 指定实现
+                .setServer(serverConfig)// 指定服务端
+                .setRepeatedExportLimit(30); //允许同一interface，同一uniqueId，不同server情况发布30次，用于单机调试
+
+        providerConfig.export(); // 发布服务
     }
 
     void registerRPCServices() {

@@ -34,7 +34,7 @@ public class Primary implements Watcher, PrimaryService {
     // e.g -399182218 -->  212.64.64.185:12201
     // NOT USED SINCE INITIAL HASH WORKERS, MAY CHANGE TO LOCAL VARIABLE
 
-    TreeMap<String, List<String>> workerkeymap = new TreeMap<>();
+    TreeMap<String, ArrayList<String>> workerkeymap = new TreeMap<>();
     // stores workerAddr --> [KeyStart, KeyEnd] mapping
     // e.g 212.64.64.185:12201  --> [-399182218,1302869320]
 
@@ -62,6 +62,27 @@ public class Primary implements Watcher, PrimaryService {
             }
         }
     };
+    AsyncCallback.ChildrenCallback workerGetChildrenCallback = new AsyncCallback.ChildrenCallback() {
+        @Override
+        public void processResult(int rc, String path, Object ctx, List<String> children) {
+            switch (KeeperException.Code.get(rc)) {
+                case CONNECTIONLOSS:
+                    try {
+                        LOG.info("retry get workers");
+                        getWorkers();
+                    } catch (KeeperException | InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    break;
+                case OK:
+                    LOG.info("Successfully got a list of workers:" + children.size() + "workers");
+                    break;
+                default:
+                    LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
+            }
+        }
+
+    };
     //主节点等待从节点的变化（包括worker node fail 或者 增加）
     //ZooKeeper客户端也可以通过getData，getChildren和exist三个接口来向ZooKeeper服务器注册Watcher
     Watcher workersChangeWatcher = new Watcher() {
@@ -82,27 +103,6 @@ public class Primary implements Watcher, PrimaryService {
                 } catch (KeeperException | InterruptedException keeperException) {
                     keeperException.printStackTrace();
                 }
-            }
-        }
-
-    };
-    AsyncCallback.ChildrenCallback workerGetChildrenCallback = new AsyncCallback.ChildrenCallback() {
-        @Override
-        public void processResult(int rc, String path, Object ctx, List<String> children) {
-            switch (KeeperException.Code.get(rc)) {
-                case CONNECTIONLOSS:
-                    try {
-                        LOG.info("retry get workers");
-                        getWorkers();
-                    } catch (KeeperException | InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    break;
-                case OK:
-                    LOG.info("Successfully got a list of workers:" + children.size() + "workers");
-                    break;
-                default:
-                    LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
             }
         }
 
@@ -181,9 +181,31 @@ public class Primary implements Watcher, PrimaryService {
         return "ERR";
     }
 
-    void resetKeyRange(String newKeyEnd, String workerAddr) {
+    void checkNewKeyEnd(String newKeyEnd, String WorkerAddr) {
+        int keyStart = Integer.parseInt(workerkeymap.get(WorkerAddr).get(0));
+        int keyEnd = Integer.parseInt(workerkeymap.get(WorkerAddr).get(1));
+        if (keyStart < keyEnd) {
+            assert keyEnd > Integer.parseInt(newKeyEnd);
+        } else {
+            assert Integer.parseInt(newKeyEnd) < keyEnd || Integer.parseInt(newKeyEnd) > keyStart;
+        }
+    }
+
+    String resetKeyRange(String newKeyEnd, String WorkerAddr, String WorkerReceiverADRR) {
         // block until the data transfer is done
         // reassign worker keyrange
+        //reuse the interface of SetKeyRange
+        try {
+            WorkerService workerService = GetServiceByWorkerADDR(WorkerAddr);
+            LOG.info("resetKeyRange " + WorkerAddr + " TO " + newKeyEnd);
+            checkNewKeyEnd(newKeyEnd, WorkerAddr);
+            workerService.ResetKeyEnd(newKeyEnd, WorkerReceiverADRR);
+            workerkeymap.get(WorkerAddr).set(1, newKeyEnd);
+            return "OK";
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "ERR";
     }
 
     public void getWorkers() throws KeeperException, InterruptedException {
@@ -192,13 +214,11 @@ public class Primary implements Watcher, PrimaryService {
     }
 
     String getWorkerADDR(String keyString) {
-        Integer hashvalue = Hash(keyString);
-        Iterator iterator = workerkeymap.keySet().iterator();
-        while (iterator.hasNext()) {
-            String workerkey = (String) iterator.next();
+        int hashvalue = Hash(keyString);
+        for (String workerkey : workerkeymap.keySet()) {
             // System.out.println(key);
-            Integer keyStart = Integer.valueOf(workerkeymap.get(workerkey).get(0));
-            Integer keyEnd = Integer.valueOf(workerkeymap.get(workerkey).get(1));
+            int keyStart = Integer.parseInt(workerkeymap.get(workerkey).get(0));
+            int keyEnd = Integer.parseInt(workerkeymap.get(workerkey).get(1));
             if (hashvalue >= keyStart && hashvalue < keyEnd) {
                 {
                     LOG.info(hashvalue + " >= " + keyStart + " and < " + keyEnd);
@@ -226,7 +246,6 @@ public class Primary implements Watcher, PrimaryService {
             workerlist = zk.getChildren("/workers", false);
         }
         for (String w : workerlist) {
-            byte data[] = zk.getData("/workers/" + w, false, null);
             //System.out.println(w);
             workermap.put(Hash(w), w);
             workerState.put(w, true);// mark workers as active
@@ -237,7 +256,7 @@ public class Primary implements Watcher, PrimaryService {
         while (iterator.hasNext()) {
             keyEnd = (Integer) iterator.next();
             // 假设主节点从不fail，将所有workerhash保存在workerkeymap,
-            List<String> list = new ArrayList();
+            ArrayList<String> list = new ArrayList<>();
             list.add(keyStart.toString());
             list.add(keyEnd.toString());
             workerkeymap.put(workermap.get(keyEnd), list);
@@ -273,8 +292,7 @@ public class Primary implements Watcher, PrimaryService {
             consumerConfig = workerConsumerConfigHashMap.get(WorkerAddr);
         }
         // 生成代理类
-        WorkerService workerService = consumerConfig.refer();
-        return workerService;
+        return consumerConfig.refer();
     }
 
     void run() throws InterruptedException {
@@ -310,15 +328,13 @@ public class Primary implements Watcher, PrimaryService {
         while (true) {
             try {
                 Stat stat = new Stat();
-                byte data[] = zk.getData("/primary", false, stat);
+                byte[] data = zk.getData("/primary", false, stat);
                 isLeader = new String(data).equals(serverId);
                 return true;
             } catch (KeeperException.NoNodeException e) {
                 return false;
-            } catch (KeeperException.ConnectionLossException e) {
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (KeeperException e) {
+            } catch (KeeperException.ConnectionLossException ignored) {
+            } catch (InterruptedException | KeeperException e) {
                 e.printStackTrace();
             }
         }
@@ -335,7 +351,7 @@ public class Primary implements Watcher, PrimaryService {
             } catch (KeeperException.NoNodeException e) {
                 isLeader = false;
                 break;
-            } catch (KeeperException.ConnectionLossException e) {
+            } catch (KeeperException.ConnectionLossException ignored) {
             } catch (KeeperException e) {
                 e.printStackTrace();
             }
@@ -370,7 +386,7 @@ public class Primary implements Watcher, PrimaryService {
             } catch (KeeperException | InterruptedException keeperException) {
                 keeperException.printStackTrace();
             }
-            Integer newWorkerNum = 0;
+            int newWorkerNum = 0;
             // check if worker fail
             for (String worker : workerlist) {
                 if (workerState.containsKey(worker)) {
@@ -419,8 +435,10 @@ public class Primary implements Watcher, PrimaryService {
                         // tell the workerReceiver to register as RPC Server
                         // (RPCport for data treansfer is 200+WorkerPort)
                         // reuse the SetKeyRange interface
+                        String workerReceiverKeyStart = Hash(workerReceiver).toString();
+                        String workerReceiverKeyEnd = workerkeymap.get(workerSenderAddr).get(1);
                         try {
-                            workerReiverService.SetKeyRange(Hash(workerReceiver).toString(), workerkeymap.get(workerSenderAddr).get(1), true);
+                            workerReiverService.SetKeyRange(workerReceiverKeyStart, workerReceiverKeyEnd, true);
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
@@ -428,9 +446,16 @@ public class Primary implements Watcher, PrimaryService {
                         // workerSender do datatransfer
                         // reset workerkeymap
                         String newKeyEnd = Hash(workerReceiver).toString();
-                        resetKeyRange(newKeyEnd, workerSenderAddr);
+                        String res = resetKeyRange(newKeyEnd, workerSenderAddr, workerReceiver);
+                        LOG.info("resetKeyRange " + res);
                         // if there are more new workers , have to wait til the former one is all set up,
                         // 缺点是可能会a->b->c传两遍数据
+
+                        LOG.info("add" + workerReceiver + "into workerkeymap and workerState");
+                        ArrayList<String> a = new ArrayList<>();
+                        a.add(workerReceiverKeyStart);
+                        a.add(workerReceiverKeyEnd);
+                        workerkeymap.put(workerReceiver, a);
                         workerState.put(workerReceiver, true);
                     }
                 }

@@ -35,6 +35,12 @@ public enum RingoDB implements DB {
         map.remove(key);
     }
 
+    public synchronized boolean hasValueInRange(String keyStart, String KeyEnd) throws RingoDBException {
+        checkKey(keyStart);
+        checkKey(KeyEnd);
+        return false;
+    }
+
     void checkKeyExists(String key) throws RingoDBException {
         if (!map.containsKey(key)) {
             //key 不存在
