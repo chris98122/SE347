@@ -64,7 +64,7 @@ public class PrimaryTest {
                 () ->
                 {
                     try {
-                        String workerargs[] = {Config.zookeeperHost, workerID.toString(), "1230" + workerID.toString()};
+                        String workerargs[] = {Config.zookeeperHost, "127.0.0.1", "1230" + workerID.toString()};
                         Worker w = new Worker(workerargs[0], workerargs[1], workerargs[2]);
                         w.startZK();
                         w.registerRPCServices();// make sure the RPC can work, then register to zookeeper
@@ -77,7 +77,23 @@ public class PrimaryTest {
                     }
                 }
         );
-        t.setName("worker");
+        t.setName("worker" + workerID);
+        t.start();
+    }
+
+    void StartWorker(Integer workerID) {
+        Thread t = new Thread(
+                () ->
+                {
+                    try {
+                        String workerargs[] = {Config.zookeeperHost, "127.0.0.1", "1230" + workerID.toString()};
+                        Worker.main(workerargs);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+        );
+        t.setName("worker" + workerID);
         t.start();
     }
 
@@ -103,10 +119,21 @@ public class PrimaryTest {
 
     @Test
     public void OneWorkerAddTest() throws Exception, MWException {
+        StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
+        Thread.sleep(12000);
+        //起1个普通worker
+        StartWorker(1);
+        Thread.sleep(30000);
     }
 
     @Test
     public void TwoWorkerAddTest() throws Exception, MWException {
+        StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
+        Thread.sleep(12000);
+        //起2个普通worker
+        StartWorker(1);
+        StartWorker(2);
+        Thread.sleep(30000);
     }
 
     @Test

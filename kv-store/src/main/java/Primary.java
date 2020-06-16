@@ -222,7 +222,7 @@ public class Primary implements Watcher, PrimaryService {
         List<String> workerlist = zk.getChildren("/workers", false);
         while (workerlist.isEmpty() || workerlist.size() == 1) {
             Thread.sleep(60);
-            LOG.warn("workers not exist");
+            LOG.warn("InitialhashWorkers(): workers not exist.");
             workerlist = zk.getChildren("/workers", false);
         }
         for (String w : workerlist) {
@@ -407,6 +407,7 @@ public class Primary implements Watcher, PrimaryService {
         public void run() {
             LOG.info("ScaleOut triggered");
             synchronized (workerConsumerConfigHashMap) {
+                // 设置workerConsumerConfigHashMap是线程安全的
                 for (String workerReceiver : workerlist) {
                     if (!workerConsumerConfigHashMap.containsKey(workerReceiver)) {
                         //workerConsumerConfigHashMap add workerReceiver in GetServiceByWorkerADDR()
