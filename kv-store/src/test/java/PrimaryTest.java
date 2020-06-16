@@ -42,8 +42,7 @@ public class PrimaryTest {
         }
     }
 
-    @Test
-    public void OneWorkerFailTest() throws Exception, MWException {
+    void StartPrimary() {
         //起primary
         String args[] = {Config.zookeeperHost, "1"};
         Thread runm = new Thread(
@@ -58,14 +57,14 @@ public class PrimaryTest {
         );
         runm.setName("primary");
         runm.start();
+    }
 
-        //起1个worker
-        Integer finalI = 2;
+    void StartWorkerCloseZookeeperAfterAwhile(Integer workerID) {
         Thread t = new Thread(
                 () ->
                 {
                     try {
-                        String workerargs[] = {Config.zookeeperHost, finalI.toString(), "1220" + finalI.toString()};
+                        String workerargs[] = {Config.zookeeperHost, workerID.toString(), "1230" + workerID.toString()};
                         Worker w = new Worker(workerargs[0], workerargs[1], workerargs[2]);
                         w.startZK();
                         w.registerRPCServices();// make sure the RPC can work, then register to zookeeper
@@ -78,14 +77,28 @@ public class PrimaryTest {
                     }
                 }
         );
-        Thread.sleep(300);
         t.setName("worker");
         t.start();
-        Thread.sleep(300000);
     }
 
     @Test
-    public void TwoWorkerFailTest() throws Exception, MWException {
+    public void OneWorkerAddThenFailTest() throws Exception, MWException {
+        StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
+        Thread.sleep(12000);
+        //起1个会断开ZOOKEEPER的worker
+        StartWorkerCloseZookeeperAfterAwhile(1);
+
+        Thread.sleep(30000);
+    }
+
+    @Test
+    public void TwoWorkerAddThenFailTest() throws Exception, MWException {
+        StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
+        Thread.sleep(12000);
+        //起1个会断开ZOOKEEPER的worker
+        StartWorkerCloseZookeeperAfterAwhile(1);
+        StartWorkerCloseZookeeperAfterAwhile(2);
+        Thread.sleep(30000);
     }
 
     @Test

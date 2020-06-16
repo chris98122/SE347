@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
 
@@ -22,6 +23,11 @@ public class Primary implements Watcher, PrimaryService {
     static Boolean isLeader;
     ZooKeeper zk;
     String hostPort;
+
+    AtomicInteger ProcessWorkerChangeCounter = new AtomicInteger(0);
+
+    AtomicInteger ScaleOutCounter = new AtomicInteger(0);
+
     TreeMap<Integer, String> workermap = new TreeMap<>();
     // helper structure for calculating workerkeymap
     // stores startKey --> workerAddr mapping
@@ -52,32 +58,9 @@ public class Primary implements Watcher, PrimaryService {
                     LOG.warn("Parent already registered:" + path);
                     break;
                 default:
-                    LOG.error("somthing went wrong" + KeeperException.create(KeeperException.Code.get(rc), path));
+                    LOG.error("something went wrong" + KeeperException.create(KeeperException.Code.get(rc), path));
             }
         }
-    };
-    AsyncCallback.ChildrenCallback workerGetChildrenCallback = new AsyncCallback.ChildrenCallback() {
-        @Override
-        public void processResult(int rc, String path, Object ctx, List<String> children) {
-            switch (KeeperException.Code.get(rc)) {
-                case CONNECTIONLOSS:
-                    try {
-                        LOG.info("retry get workers");
-                        getWorkers();
-                    } catch (KeeperException e) {
-                        e.printStackTrace();
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    break;
-                case OK:
-                    LOG.info("Successfully got a list of workers:" + children.size() + "workers");
-                    break;
-                default:
-                    LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
-            }
-        }
-
     };
     //主节点等待从节点的变化（包括worker node fail 或者 增加）
     //ZooKeeper客户端也可以通过getData，getChildren和exist三个接口来向ZooKeeper服务器注册Watcher
@@ -94,13 +77,32 @@ public class Primary implements Watcher, PrimaryService {
                     getWorkers();//watcher是一次性的所以必须再次注册
                     //客户端 Watcher 回调的过程是一个串行同步的过程，所以另开线程处理
                     ProcessWorkerChange processWorkerChange = new ProcessWorkerChange();
-                    processWorkerChange.setName("processWorkerChange");
+                    processWorkerChange.setName("processWorkerChange" + ProcessWorkerChangeCounter.addAndGet(1));
                     processWorkerChange.start();
-                } catch (KeeperException keeperException) {
+                } catch (KeeperException | InterruptedException keeperException) {
                     keeperException.printStackTrace();
-                } catch (InterruptedException interruptedException) {
-                    interruptedException.printStackTrace();
                 }
+            }
+        }
+
+    };
+    AsyncCallback.ChildrenCallback workerGetChildrenCallback = new AsyncCallback.ChildrenCallback() {
+        @Override
+        public void processResult(int rc, String path, Object ctx, List<String> children) {
+            switch (KeeperException.Code.get(rc)) {
+                case CONNECTIONLOSS:
+                    try {
+                        LOG.info("retry get workers");
+                        getWorkers();
+                    } catch (KeeperException | InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    break;
+                case OK:
+                    LOG.info("Successfully got a list of workers:" + children.size() + "workers");
+                    break;
+                default:
+                    LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
             }
         }
 
@@ -113,27 +115,20 @@ public class Primary implements Watcher, PrimaryService {
         isLeader = false;
     }
 
-    public static void main(String args[])
+    public static void main(String[] args)
             throws Exception {
         Primary m = new Primary(args[0]);
         m.startZK();
         m.runForPrimary();
-        if (m.isLeader) {
-            try {
-                System.out.println("I'm the leader.");
-                System.out.println("serverId:" + m.serverId);
-                m.boostrap();
-                m.InitialhashWorkers();
-                m.getWorkers();//register the "/worker"" Watcher
+        if (isLeader) {
+            System.out.println("I'm the leader.");
+            System.out.println("serverId:" + serverId);
+            m.boostrap();
+            m.InitialhashWorkers();// block until initialize at 2 workers
+            m.getWorkers();//register the "/worker"" Watcher
 
-                m.registerRPCServices(); //after setting the Master-Worker , the Master can receive rpc from clients
-                m.run();
-            } catch (MWException e) {
-                e.printStackTrace();
-                System.out.println(e.getMessage());
-                m.getWorkers();//register the "/worker"" Watcher
-
-            }
+            m.registerRPCServices(); //after setting the Master-Worker , the Master can receive rpc from clients
+            m.run();
         } else {
             System.out.println("Some one else is the leader.");
         }
@@ -219,19 +214,22 @@ public class Primary implements Watcher, PrimaryService {
         return "ERR";
     }
 
-    void InitialhashWorkers() throws KeeperException, InterruptedException, MWException {
+    void InitialhashWorkers() throws KeeperException, InterruptedException {
         //此函数只在启动master时运行一次
         //可扩展性与workerfail依靠对worker znode的Watcher函数
 
         System.out.println("Workers:");
-        for (String w : zk.getChildren("/workers", false)) {
+        List<String> workerlist = zk.getChildren("/workers", false);
+        while (workerlist.isEmpty() || workerlist.size() == 1) {
+            Thread.sleep(60);
+            LOG.warn("workers not exist");
+            workerlist = zk.getChildren("/workers", false);
+        }
+        for (String w : workerlist) {
             byte data[] = zk.getData("/workers/" + w, false, null);
             //System.out.println(w);
             workermap.put(Hash(w), w);
             workerState.put(w, true);// mark workers as active
-        }
-        if (workermap.isEmpty()) {
-            throw new MWException("workers not exist");
         }
         Iterator iterator = workermap.keySet().iterator();
         Integer keyStart = workermap.lastKey();
@@ -365,8 +363,10 @@ public class Primary implements Watcher, PrimaryService {
     // last get workerlist
     class ProcessWorkerChange extends Thread {
         public void run() {
+
             try {
                 workerlist = zk.getChildren("/workers", null);//sync call
+                LOG.info(String.valueOf(workerlist));
             } catch (KeeperException | InterruptedException keeperException) {
                 keeperException.printStackTrace();
             }
@@ -390,9 +390,9 @@ public class Primary implements Watcher, PrimaryService {
             }
             if (newWorkerNum >= 1) {
                 LOG.info(newWorkerNum + " new workers");
-                // ScaleOutProcess.start();
+                //有可能newWorkerNum大于1，暂时先只处理等于1的情况
                 ScaleOut scaleOut = new ScaleOut();
-                scaleOut.setName("processWorkerChange");
+                scaleOut.setName("scaleOut" + ScaleOutCounter.addAndGet(1));
                 scaleOut.start();
             }
         }
@@ -405,6 +405,7 @@ public class Primary implements Watcher, PrimaryService {
                         而且对workerConsumerConfigHashMap等map的操作也保证是线程安全的
                     */
         public void run() {
+            LOG.info("ScaleOut triggered");
             synchronized (workerConsumerConfigHashMap) {
                 for (String workerReceiver : workerlist) {
                     if (!workerConsumerConfigHashMap.containsKey(workerReceiver)) {
@@ -417,8 +418,11 @@ public class Primary implements Watcher, PrimaryService {
                         // tell the workerReceiver to register as RPC Server
                         // (RPCport for data treansfer is 200+WorkerPort)
                         // reuse the SetKeyRange interface
-                        workerReiverService.SetKeyRange(Hash(workerReceiver).toString(), workerkeymap.get(workerSenderAddr).get(1), true);
-
+                        try {
+                            workerReiverService.SetKeyRange(Hash(workerReceiver).toString(), workerkeymap.get(workerSenderAddr).get(1), true);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
                         // notify the workerSender's to reset keyrange
                         // workerSender do datatransfer
                         // reset workerkeymap
