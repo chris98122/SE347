@@ -94,12 +94,11 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         String workerip = WorkerAddr.split(":")[0];
         String workerport = WorkerAddr.split(":")[1];
 
-        int port = Integer.parseInt(WorkerPort) + DataTransferoffset;
-        LOG.info("GetServiceByWorkerADDR " + workerip + ":" + port);
+        LOG.info("GetServiceByWorkerADDR " + workerip + ":" + workerport);
         consumerConfig = new ConsumerConfig<DataTransferService>()
                 .setInterfaceId(DataTransferService.class.getName()) // 指定接口
                 .setProtocol("bolt") // 指定协议
-                .setDirectUrl("bolt://" + workerip + ":" + port) // 指定直连地址
+                .setDirectUrl("bolt://" + workerip + ":" + workerport) // 指定直连地址
                 .setTimeout(2000)
                 .setRepeatedReferLimit(30); //允许同一interface，同一uniqueId，不同server情况refer 30次，用于单机调试
         // 生成代理类
@@ -196,12 +195,10 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     }
 
     void registerDataTransferService() {
-        int port = Integer.parseInt(WorkerPort) + DataTransferoffset;
-        LOG.info("registerDataTransferService" + port);
         try {
             ServerConfig serverConfig = (ServerConfig) new ServerConfig()
                     .setProtocol("bolt") // 设置一个协议，默认bolt
-                    .setPort(port) // 设置一个端口，即args[2]
+                    .setPort(Integer.parseInt(WorkerPort)) // 设置一个端口，即args[2]
                     .setDaemon(true);// 守护线程
 
             ProviderConfig<DataTransferService> providerConfig = new ProviderConfig<DataTransferService>()
