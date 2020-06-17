@@ -32,7 +32,13 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     LOG.info("Registered successfully:" + serverId);
                     break;
                 case NODEEXISTS:
+                    // RETRY JUST FOR EASY DEPLOYMENT, SHOULD MODIFY LATER
                     LOG.warn("Already registered:" + serverId);
+                    try {
+                        Thread.sleep(600);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
                     registerToZookeeper();//try agagin
                     break;
                 default:

@@ -1,5 +1,6 @@
 package DB;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,6 +15,13 @@ public enum RingoDB implements DB {
     static Integer snapshot_version = 0;
     TreeMap<String, String> map = new TreeMap<String, String>();
     String SNAPSHOT_DIR = "./";
+
+    public static Integer Hash(String string) {
+        //加密后的字符串
+        String encodeStr = DigestUtils.md5Hex(string);
+        //System.out.println("MD5加密后的字符串为:encodeStr="+encodeStr);
+        return encodeStr.hashCode();
+    }
 
     @Override
     public synchronized void Put(String key, String value) throws RingoDBException {
@@ -43,13 +51,19 @@ public enum RingoDB implements DB {
     public synchronized boolean hasValueInRange(String keyStart, String KeyEnd) throws RingoDBException {
         checkKey(keyStart);
         checkKey(KeyEnd);
+        for (String key : map.keySet()) {
+            if (inRange(key, keyStart, KeyEnd)) {
+                return true;
+            }
+        }
+
         return false;
     }
 
     private boolean inRange(String key, String keyStart, String KeyEnd) {
         int keystart = Integer.parseInt(keyStart);
         int keyend = Integer.parseInt(KeyEnd);
-        int newkey = Integer.parseInt(key);
+        int newkey = Hash(key);
         if (keystart < keyend) {
             return newkey >= keystart && newkey < keyend;
         }

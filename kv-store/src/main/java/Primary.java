@@ -81,7 +81,6 @@ public class Primary implements Watcher, PrimaryService {
                     LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
             }
         }
-
     };
     //主节点等待从节点的变化（包括worker node fail 或者 增加）
     //ZooKeeper客户端也可以通过getData，getChildren和exist三个接口来向ZooKeeper服务器注册Watcher
@@ -105,7 +104,6 @@ public class Primary implements Watcher, PrimaryService {
                 }
             }
         }
-
     };
 
     Primary(String hostPort) throws UnknownHostException {
