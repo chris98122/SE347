@@ -57,6 +57,7 @@ public class ScaleOutTest {
 
     @Test
     public void DataTransferRPCTest() throws Exception, MWException {
+        //本地两个worker互联测试
         Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
         Thread.sleep(12000);
 

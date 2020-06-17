@@ -297,6 +297,7 @@ public class Primary implements Watcher, PrimaryService {
             consumerConfig = workerConsumerConfigHashMap.get(WorkerAddr);
         }
         // 生成代理类
+
         return consumerConfig.refer();
     }
 
@@ -446,16 +447,19 @@ public class Primary implements Watcher, PrimaryService {
                         // reuse the SetKeyRange interface
                         String workerReceiverKeyStart = Hash(workerReceiver).toString();
                         String workerReceiverKeyEnd = workerkeymap.get(workerSenderAddr).get(1);
+                        String res = null;
                         try {
-                            workerReiverService.SetKeyRange(workerReceiverKeyStart, workerReceiverKeyEnd, true);
+                            res = workerReiverService.SetKeyRange(workerReceiverKeyStart, workerReceiverKeyEnd, true);
+
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
+                        assert res.equals("OK");
                         // notify the workerSender's to reset keyrange
                         // workerSender do datatransfer
                         // reset workerkeymap
                         String newKeyEnd = Hash(workerReceiver).toString();
-                        String res = resetKeyRange(newKeyEnd, workerSenderAddr, workerReceiver);
+                        res = resetKeyRange(newKeyEnd, workerSenderAddr, workerReceiver);
                         LOG.info("resetKeyRange " + res);
                         // if there are more new workers , have to wait til the former one is all set up,
                         // 缺点是可能会a->b->c传两遍数据
