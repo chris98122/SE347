@@ -20,6 +20,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     String serverId;
     String KeyStart = null;
     String KeyEnd = null;
+    int DataTransferoffset = 10;
     AsyncCallback.StringCallback createWorkerCallback = new AsyncCallback.StringCallback() {
         @Override
         public void processResult(int rc, String path, Object ctx, String name) {
@@ -92,11 +93,11 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         ConsumerConfig<DataTransferService> consumerConfig;
         String workerip = WorkerAddr.split(":")[0];
         String workerport = WorkerAddr.split(":")[1];
-        LOG.info("GetServiceByWorkerADDR " + workerip + ":" + workerport);
+        LOG.info("GetServiceByWorkerADDR " + workerip + ":" + Integer.parseInt(WorkerPort) + DataTransferoffset);
         consumerConfig = new ConsumerConfig<DataTransferService>()
                 .setInterfaceId(DataTransferService.class.getName()) // 指定接口
                 .setProtocol("bolt") // 指定协议
-                .setDirectUrl("bolt://" + workerip + ":" + workerport) // 指定直连地址
+                .setDirectUrl("bolt://" + workerip + ":" + (Integer.parseInt(WorkerPort) + DataTransferoffset)) // 指定直连地址
                 .setTimeout(2000)
                 .setRepeatedReferLimit(30); //允许同一interface，同一uniqueId，不同server情况refer 30次，用于单机调试
         // 生成代理类
@@ -105,7 +106,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
     @Override
     public String ResetKeyEnd(String NewKeyEnd, String WorkerReceiverADRR) {
-        LOG.info("ResetKeyEnd to " + NewKeyEnd);
+        LOG.info("ready ResetKeyEnd to " + NewKeyEnd);
         if (checkNeedDataTransfer(NewKeyEnd, this.KeyEnd)) {
             try {
                 TreeMap<String, String> data = RingoDB.INSTANCE.SplitTreeMap(this.KeyEnd, NewKeyEnd);
@@ -194,17 +195,20 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
     void registerDataTransferService() {
         LOG.info("registerDataTransferService");
-        ServerConfig serverConfig = (ServerConfig) new ServerConfig()
-                .setProtocol("bolt") // 设置一个协议，默认bolt
-                .setPort(Integer.parseInt(WorkerPort)) // 设置一个端口，即args[2]
-                .setDaemon(true); // 守护线程
-
-        ProviderConfig<DataTransferService> providerConfig = new ProviderConfig<DataTransferService>()
-                .setInterfaceId(DataTransferService.class.getName()) // 指定接口
-                .setRef(this)  // 指定实现
-                .setServer(serverConfig)// 指定服务端
-                .setRepeatedExportLimit(30); //允许同一interface，同一uniqueId，不同server情况发布30次，用于单机调试
         try {
+            ServerConfig serverConfig = (ServerConfig) new ServerConfig()
+                    .setProtocol("bolt") // 设置一个协议，默认bolt
+                    .setPort(Integer.parseInt(WorkerPort) + DataTransferoffset) // 设置一个端口，即args[2]
+                    .setDaemon(true)// 守护线程
+                    .setAccepts(10)
+                    .setMaxThreads(5);
+
+            ProviderConfig<DataTransferService> providerConfig = new ProviderConfig<DataTransferService>()
+                    .setInterfaceId(DataTransferService.class.getName()) // 指定接口
+                    .setRef(this)  // 指定实现
+                    .setServer(serverConfig)// 指定服务端
+                    .setRepeatedExportLimit(30); //允许同一interface，同一uniqueId，不同server情况发布30次，用于单机调试
+
             providerConfig.export(); // 发布服务
         } catch (Exception e) {
             e.printStackTrace();
@@ -212,18 +216,22 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     }
 
     void registerRPCServices() {
-        ServerConfig serverConfig = (ServerConfig) new ServerConfig()
-                .setProtocol("bolt") // 设置一个协议，默认bolt
-                .setPort(Integer.parseInt(WorkerPort)) // 设置一个端口，即args[2]
-                .setDaemon(true); // 守护线程
+        try {
+            ServerConfig serverConfig = (ServerConfig) new ServerConfig()
+                    .setProtocol("bolt") // 设置一个协议，默认bolt
+                    .setPort(Integer.parseInt(WorkerPort)) // 设置一个端口，即args[2]
+                    .setDaemon(true); // 守护线程
 
-        ProviderConfig<WorkerService> providerConfig = new ProviderConfig<WorkerService>()
-                .setInterfaceId(WorkerService.class.getName()) // 指定接口
-                .setRef(this)  // 指定实现
-                .setServer(serverConfig)// 指定服务端
-                .setRepeatedExportLimit(30); //允许同一interface，同一uniqueId，不同server情况发布30次，用于单机调试
+            ProviderConfig<WorkerService> providerConfig = new ProviderConfig<WorkerService>()
+                    .setInterfaceId(WorkerService.class.getName()) // 指定接口
+                    .setRef(this)  // 指定实现
+                    .setServer(serverConfig)// 指定服务端
+                    .setRepeatedExportLimit(30); //允许同一interface，同一uniqueId，不同server情况发布30次，用于单机调试
 
-        providerConfig.export(); // 发布服务
+            providerConfig.export(); // 发布服务
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     void startZK() {
