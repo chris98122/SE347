@@ -33,6 +33,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     break;
                 case NODEEXISTS:
                     LOG.warn("Already registered:" + serverId);
+                    registerToZookeeper();//try agagin
                     break;
                 default:
                     LOG.error("Something went wrong:" + KeeperException.create(KeeperException.Code.get(rc), path));
@@ -62,6 +63,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
     boolean checkNeedDataTransfer(String start, String end) {
         try {
+            LOG.info("checkNeedDataTransfer: " + start + " " + end);
             return RingoDB.INSTANCE.hasValueInRange(start, end);
         } catch (RingoDBException e) {
             e.printStackTrace();
@@ -98,11 +100,11 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     public String ResetKeyEnd(String NewKeyEnd, String WorkerReceiverADRR) {
         LOG.info("ResetKeyEnd to " + NewKeyEnd);
         if (checkNeedDataTransfer(NewKeyEnd, this.KeyEnd)) {
-            LOG.info("do datatransfer");
             try {
                 TreeMap<String, String> data = RingoDB.INSTANCE.SplitTreeMap(this.KeyEnd, NewKeyEnd);
                 String res = GetServiceByWorkerADDR(WorkerReceiverADRR).DoTransfer(data);
                 //delete db data
+                LOG.info("do datatransfer: " + data);
                 return res;
             } catch (RingoDBException e) {
                 e.printStackTrace();

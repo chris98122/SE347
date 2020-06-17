@@ -10,8 +10,12 @@ public class ScaleOutTest {
         PrimaryService primaryService = client.PrimaryConnection();
         assertEquals("OK", primaryService.PUT("ringo", "apple"));
         assertEquals("OK", primaryService.PUT("banana", "banana"));
-        assertEquals("OK", primaryService.PUT("watermelon", "banana"));
+        assertEquals("OK", primaryService.PUT("watermelon", "watermelon"));
         assertEquals("OK", primaryService.PUT("papaya", "papaya"));
+        assertEquals("OK", primaryService.PUT("strawberry", "strawberry"));
+        assertEquals("OK", primaryService.PUT("pear", "pear"));
+        assertEquals("OK", primaryService.PUT("apricot", "apricot"));
+        assertEquals("OK", primaryService.PUT("peach", "peach"));
     }
 
     @Test
