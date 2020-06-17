@@ -9,7 +9,11 @@ import java.util.TreeMap;
 import static org.junit.Assert.assertEquals;
 
 public class ScaleOutTest {
-    void StoreData() throws Exception {
+    public static void main(String args[]) throws Exception, MWException {
+        TwoWorkerAddTest();
+    }
+
+    static void StoreData() throws Exception {
         Client client = new Client(Config.zookeeperHost);
         client.startZK();
         PrimaryService primaryService = client.PrimaryConnection();
@@ -26,6 +30,21 @@ public class ScaleOutTest {
     }
 
     @Test
+    public static void TwoWorkerAddTest() throws Exception, MWException {
+        Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
+        Thread.sleep(12000);
+
+        // 存入一些data
+        StoreData();
+
+        //起2个普通worker
+        Config.StartWorker(1);
+        Thread.sleep(2000);
+        Config.StartWorker(2);
+        Thread.sleep(30000);
+    }
+
+    @Test
     public void OneWorkerAddTest() throws Exception, MWException {
         Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
         Thread.sleep(12000);
@@ -37,21 +56,6 @@ public class ScaleOutTest {
 
         //起1个普通worker
         Config.StartWorker(1);
-        Thread.sleep(30000);
-    }
-
-    @Test
-    public void TwoWorkerAddTest() throws Exception, MWException {
-        Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
-        Thread.sleep(12000);
-
-        // 存入一些data
-        StoreData();
-
-        //起2个普通worker
-        Config.StartWorker(1);
-        Thread.sleep(2000);
-        Config.StartWorker(2);
         Thread.sleep(30000);
     }
 
