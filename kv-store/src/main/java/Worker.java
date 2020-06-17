@@ -192,7 +192,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     }
 
     void registerDataTransferService() {
-        LOG.info("registerDataTrensferService");
+        LOG.info("registerDataTransferService");
         ServerConfig serverConfig = (ServerConfig) new ServerConfig()
                 .setProtocol("bolt") // 设置一个协议，默认bolt
                 .setPort(Integer.parseInt(WorkerPort)) // 设置一个端口，即args[2]

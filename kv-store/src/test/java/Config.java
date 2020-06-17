@@ -23,7 +23,7 @@ public class Config {
                 () ->
                 {
                     try {
-                        String workerargs[] = {Config.zookeeperHost, "127.0.0.1", "1230" + workerID.toString()};
+                        String workerargs[] = {Config.zookeeperHost, PrivateData.ip, "1230" + workerID.toString()};
                         Worker w = new Worker(workerargs[0], workerargs[1], workerargs[2]);
                         w.startZK();
                         w.registerRPCServices();// make sure the RPC can work, then register to zookeeper
@@ -45,7 +45,7 @@ public class Config {
                 () ->
                 {
                     try {
-                        String workerargs[] = {Config.zookeeperHost, "127.0.0.1", "1230" + workerID.toString()};
+                        String workerargs[] = {Config.zookeeperHost,PrivateData.ip, "1230" + workerID.toString()};
                         Worker.main(workerargs);
                     } catch (Exception e) {
                         e.printStackTrace();
