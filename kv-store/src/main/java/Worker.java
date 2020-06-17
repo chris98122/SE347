@@ -93,7 +93,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         String workerip = WorkerAddr.split(":")[0];
         String workerport = WorkerAddr.split(":")[1];
         consumerConfig = new ConsumerConfig<DataTransferService>()
-                .setInterfaceId(WorkerService.class.getName()) // 指定接口
+                .setInterfaceId(DataTransferService.class.getName()) // 指定接口
                 .setProtocol("bolt") // 指定协议
                 .setDirectUrl("bolt://" + workerip + ":" + workerport) // 指定直连地址
                 .setTimeout(2000)
