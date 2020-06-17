@@ -460,7 +460,7 @@ public class Primary implements Watcher, PrimaryService {
                         // if there are more new workers , have to wait til the former one is all set up,
                         // 缺点是可能会a->b->c传两遍数据
 
-                        LOG.info("add" + workerReceiver + "into workerkeymap and workerState");
+                        LOG.info("add " + workerReceiver + "  workerkeymap and workerState");
                         ArrayList<String> a = new ArrayList<>();
                         a.add(workerReceiverKeyStart);
                         a.add(workerReceiverKeyEnd);
