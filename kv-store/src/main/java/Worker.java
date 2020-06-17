@@ -81,6 +81,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
     @Override
     public String DoTransfer(TreeMap<String, String> data) {
+        LOG.info("DoTransfer" + String.valueOf(data));
         try {
             RingoDB.INSTANCE.setMap(data);
             return "OK";
@@ -96,7 +97,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             String workerip = WorkerAddr.split(":")[0];
             String workerport = WorkerAddr.split(":")[1];
 
-            int port = Integer.parseInt(workerport) + DataTransferoffset;
+            int port = Integer.parseInt(workerport);
             LOG.info("GetServiceByWorkerADDR " + workerip + ":" + port);
             consumerConfig = new ConsumerConfig<DataTransferService>()
                     .setInterfaceId(DataTransferService.class.getName()) // 指定接口
@@ -108,6 +109,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         } catch (Exception e) {
             LOG.error(Arrays.toString(e.getStackTrace()));
         }   // 生成代理类
+        assert consumerConfig != null;
         return consumerConfig.refer();
     }
 
@@ -203,7 +205,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     void registerDataTransferService() {
         try {
 
-            int port = Integer.parseInt(WorkerPort) + DataTransferoffset;
+            int port = Integer.parseInt(WorkerPort);
             LOG.info("registerDataTransferService PORT" + port);
             ServerConfig serverConfig = (ServerConfig) new ServerConfig()
                     .setProtocol("bolt") // 设置一个协议，默认bolt
