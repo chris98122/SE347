@@ -102,13 +102,12 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     .setInterfaceId(DataTransferService.class.getName()) // 指定接口
                     .setProtocol("bolt") // 指定协议
                     .setDirectUrl("bolt://" + workerip + ":" + port) // 指定直连地址
-                    .setTimeout(2000)
+                    .setTimeout(20000)
                     .setRepeatedReferLimit(30); //允许同一interface，同一uniqueId，不同server情况refer 30次，用于单机调试
 
         } catch (Exception e) {
             LOG.error(Arrays.toString(e.getStackTrace()));
         }   // 生成代理类
-        assert consumerConfig != null;
         return consumerConfig.refer();
     }
 
