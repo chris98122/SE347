@@ -92,6 +92,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         ConsumerConfig<DataTransferService> consumerConfig;
         String workerip = WorkerAddr.split(":")[0];
         String workerport = WorkerAddr.split(":")[1];
+        LOG.info("GetServiceByWorkerADDR " + workerip + ":" + workerport);
         consumerConfig = new ConsumerConfig<DataTransferService>()
                 .setInterfaceId(DataTransferService.class.getName()) // 指定接口
                 .setProtocol("bolt") // 指定协议
@@ -108,12 +109,12 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         if (checkNeedDataTransfer(NewKeyEnd, this.KeyEnd)) {
             try {
                 TreeMap<String, String> data = RingoDB.INSTANCE.SplitTreeMap(this.KeyEnd, NewKeyEnd);
+                LOG.info("do datatransfer: " + data);
                 String res = GetServiceByWorkerADDR(WorkerReceiverADRR).DoTransfer(data);
                 //delete db data
-                LOG.info("do datatransfer: " + data);
                 return res;
-            } catch (RingoDBException e) {
-                e.printStackTrace();
+            } catch (Exception e) {
+                LOG.error(String.valueOf(e));
             }
         } else {
             LOG.info("no need for datatransfer");
@@ -142,7 +143,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         if (dataTranfer) {
             // register as RPC Server
             registerDataTransferService();
-            LOG.info("New Worker resgistered data transfer Service");
+            LOG.info(serverId + " resgistered data transfer Service");
             // (RPC port for data transfer is the same as WorkerPort)
             return "OK";
         }
@@ -203,8 +204,11 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 .setRef(this)  // 指定实现
                 .setServer(serverConfig)// 指定服务端
                 .setRepeatedExportLimit(30); //允许同一interface，同一uniqueId，不同server情况发布30次，用于单机调试
-
-        providerConfig.export(); // 发布服务
+        try {
+            providerConfig.export(); // 发布服务
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     void registerRPCServices() {

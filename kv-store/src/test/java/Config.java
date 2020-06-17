@@ -45,7 +45,7 @@ public class Config {
                 () ->
                 {
                     try {
-                        String workerargs[] = {Config.zookeeperHost,PrivateData.ip, "1230" + workerID.toString()};
+                        String workerargs[] = {Config.zookeeperHost, PrivateData.ip, "1230" + workerID.toString()};
                         Worker.main(workerargs);
                     } catch (Exception e) {
                         e.printStackTrace();

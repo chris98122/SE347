@@ -16,6 +16,8 @@ public class ScaleOutTest {
         assertEquals("OK", primaryService.PUT("pear", "pear"));
         assertEquals("OK", primaryService.PUT("apricot", "apricot"));
         assertEquals("OK", primaryService.PUT("peach", "peach"));
+        assertEquals("OK", primaryService.PUT("melon", "melon"));
+        assertEquals("OK", primaryService.PUT("pineapple", "pineapple"));
     }
 
     @Test
@@ -43,6 +45,7 @@ public class ScaleOutTest {
 
         //起2个普通worker
         Config.StartWorker(1);
+        Thread.sleep(2000);
         Config.StartWorker(2);
         Thread.sleep(30000);
     }
