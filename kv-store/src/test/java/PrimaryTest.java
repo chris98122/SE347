@@ -42,97 +42,42 @@ public class PrimaryTest {
         }
     }
 
-    void StartPrimary() {
-        //起primary
-        String args[] = {Config.zookeeperHost, "1"};
-        Thread runm = new Thread(
-                () ->
-                {
-                    try {
-                        Primary.main(args);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-        );
-        runm.setName("primary");
-        runm.start();
-    }
-
-    void StartWorkerCloseZookeeperAfterAwhile(Integer workerID) {
-        Thread t = new Thread(
-                () ->
-                {
-                    try {
-                        String workerargs[] = {Config.zookeeperHost, "127.0.0.1", "1230" + workerID.toString()};
-                        Worker w = new Worker(workerargs[0], workerargs[1], workerargs[2]);
-                        w.startZK();
-                        w.registerRPCServices();// make sure the RPC can work, then register to zookeeper
-                        w.registerToZookeeper();// if the worker is a new one, master should call rpc SetKeyRange
-                        Thread.sleep(2000);
-                        //主动断开
-                        w.zk.close();
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-        );
-        t.setName("worker" + workerID);
-        t.start();
-    }
-
-    void StartWorker(Integer workerID) {
-        Thread t = new Thread(
-                () ->
-                {
-                    try {
-                        String workerargs[] = {Config.zookeeperHost, "127.0.0.1", "1230" + workerID.toString()};
-                        Worker.main(workerargs);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-        );
-        t.setName("worker" + workerID);
-        t.start();
-    }
-
     @Test
     public void OneWorkerAddThenFailTest() throws Exception, MWException {
-        StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
+        Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
         Thread.sleep(12000);
         //起1个会断开ZOOKEEPER的worker
-        StartWorkerCloseZookeeperAfterAwhile(1);
+        Config.StartWorkerCloseZookeeperAfterAwhile(1);
 
         Thread.sleep(30000);
     }
 
     @Test
     public void TwoWorkerAddThenFailTest() throws Exception, MWException {
-        StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
+        Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
         Thread.sleep(12000);
         //起1个会断开ZOOKEEPER的worker
-        StartWorkerCloseZookeeperAfterAwhile(1);
-        StartWorkerCloseZookeeperAfterAwhile(2);
+        Config.StartWorkerCloseZookeeperAfterAwhile(1);
+        Config.StartWorkerCloseZookeeperAfterAwhile(2);
         Thread.sleep(30000);
     }
 
     @Test
     public void OneWorkerAddTest() throws Exception, MWException {
-        StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
+        Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
         Thread.sleep(12000);
         //起1个普通worker
-        StartWorker(1);
+        Config.StartWorker(1);
         Thread.sleep(30000);
     }
 
     @Test
     public void TwoWorkerAddTest() throws Exception, MWException {
-        StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
+        Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
         Thread.sleep(12000);
         //起2个普通worker
-        StartWorker(1);
-        StartWorker(2);
+        Config.StartWorker(1);
+        Config.StartWorker(2);
         Thread.sleep(30000);
     }
 

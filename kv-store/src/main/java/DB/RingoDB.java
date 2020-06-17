@@ -35,10 +35,39 @@ public enum RingoDB implements DB {
         map.remove(key);
     }
 
+    public void setMap(TreeMap<String, String> data) throws RingoDBException {
+        assert map.isEmpty();
+        map = data;
+    }
+
     public synchronized boolean hasValueInRange(String keyStart, String KeyEnd) throws RingoDBException {
         checkKey(keyStart);
         checkKey(KeyEnd);
         return false;
+    }
+
+    private boolean inRange(String key, String keyStart, String KeyEnd) {
+        int keystart = Integer.parseInt(keyStart);
+        int keyend = Integer.parseInt(KeyEnd);
+        int newkey = Integer.parseInt(key);
+        if (keystart < keyend) {
+            return newkey >= keystart && newkey < keyend;
+        }
+        if (keystart > keyend) {
+            return newkey >= keystart || newkey < keyend;
+        }
+        return false;
+    }
+
+    public TreeMap<String, String> SplitTreeMap(String keyStart, String KeyEnd) throws RingoDBException {
+        TreeMap<String, String> res = new TreeMap<>();
+
+        for (String key : map.keySet()) {
+            if (inRange(key, keyStart, KeyEnd)) {
+                res.put(key, map.get(key));
+            }
+        }
+        return res;
     }
 
     void checkKeyExists(String key) throws RingoDBException {
@@ -52,6 +81,7 @@ public enum RingoDB implements DB {
         snapshot_version++;
         return "snapshot-" + snapshot_version.toString();
     }
+
 
     String get_snapshot_name() {
         File dir = new File(SNAPSHOT_DIR); //要遍历的目录

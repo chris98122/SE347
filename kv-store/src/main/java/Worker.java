@@ -1,5 +1,6 @@
 import DB.RingoDB;
 import DB.RingoDBException;
+import com.alipay.sofa.rpc.config.ConsumerConfig;
 import com.alipay.sofa.rpc.config.ProviderConfig;
 import com.alipay.sofa.rpc.config.ServerConfig;
 import lib.DataTransferService;
@@ -9,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.UnknownHostException;
+import java.util.TreeMap;
 
 public class Worker implements Watcher, WorkerService, DataTransferService {
     private static final Logger LOG = LoggerFactory.getLogger(Worker.class);
@@ -45,7 +47,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         // WorkerID is used to distinguish different worker processes on one machine
     }
 
-    public static void main(String args[]) throws Exception {
+    public static void main(String[] args) throws Exception {
         Worker w = new Worker(args[0], args[1], args[2]);
         w.startZK();
         w.registerRPCServices();// make sure the RPC can work, then register to zookeeper
@@ -68,11 +70,44 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     }
 
     @Override
-    public String ResetKeyEnd(String keyend, String WorkerReceiverADRR) {
-        if (checkNeedDataTransfer(keyend, this.KeyEnd)) {
+    public String DoTransfer(TreeMap<String, String> data) {
+        try {
+            RingoDB.INSTANCE.setMap(data);
+            return "OK";
+        } catch (RingoDBException e) {
+            e.printStackTrace();
+        }
+        return "ERR";
+    }
+
+    DataTransferService GetServiceByWorkerADDR(String WorkerAddr) {
+        ConsumerConfig<DataTransferService> consumerConfig;
+        String workerip = WorkerAddr.split(":")[0];
+        String workerport = WorkerAddr.split(":")[1];
+        consumerConfig = new ConsumerConfig<DataTransferService>()
+                .setInterfaceId(WorkerService.class.getName()) // 指定接口
+                .setProtocol("bolt") // 指定协议
+                .setDirectUrl("bolt://" + workerip + ":" + workerport) // 指定直连地址
+                .setTimeout(2000)
+                .setRepeatedReferLimit(30); //允许同一interface，同一uniqueId，不同server情况refer 30次，用于单机调试
+        // 生成代理类
+        return consumerConfig.refer();
+    }
+
+    @Override
+    public String ResetKeyEnd(String NewKeyEnd, String WorkerReceiverADRR) {
+        LOG.info("ResetKeyEnd to " + NewKeyEnd);
+        if (checkNeedDataTransfer(NewKeyEnd, this.KeyEnd)) {
             LOG.info("do datatransfer");
+            try {
+                TreeMap<String, String> data = RingoDB.INSTANCE.SplitTreeMap(this.KeyEnd, NewKeyEnd);
+                return GetServiceByWorkerADDR(WorkerReceiverADRR).DoTransfer(data);
+            } catch (RingoDBException e) {
+                e.printStackTrace();
+            }
         } else {
             LOG.info("no need for datatransfer");
+            this.KeyEnd = NewKeyEnd;
             return "OK";
         }
         return "ERR";
@@ -87,9 +122,12 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 LOG.info("initialize keyrage to " + keystart + ":" + keyend);
                 return "OK";
             }
-        } else if (this.KeyStart.equals(keystart) && this.KeyEnd.equals(keyend)) {
-            LOG.info("reset keyrage to same value.");
-            return "OK";
+        } else {
+            assert this.KeyStart != null;
+            if (this.KeyStart.equals(keystart) && this.KeyEnd.equals(keyend)) {
+                LOG.info("reset keyrage to same value.");
+                return "OK";
+            }
         }
         if (dataTranfer) {
             // register as RPC Server

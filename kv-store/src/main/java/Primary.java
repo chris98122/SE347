@@ -145,6 +145,7 @@ public class Primary implements Watcher, PrimaryService {
     @Override
     public String PUT(String key, String value) {
         String WorkerAddr = getWorkerADDR(key);
+        assert (workerState.get(WorkerAddr));
         try {
             WorkerService workerService = GetServiceByWorkerADDR(WorkerAddr);
             LOG.info("ASSIGN PUT " + key + ":" + value + " TO " + WorkerAddr);
@@ -158,6 +159,7 @@ public class Primary implements Watcher, PrimaryService {
     @Override
     public String GET(String key) {
         String WorkerAddr = getWorkerADDR(key);
+        assert (workerState.get(WorkerAddr));
         try {
             WorkerService workerService = GetServiceByWorkerADDR(WorkerAddr);
             LOG.info("ASSIGN GET " + key + " TO " + WorkerAddr);
@@ -171,6 +173,7 @@ public class Primary implements Watcher, PrimaryService {
     @Override
     public String DELETE(String key) {
         String WorkerAddr = getWorkerADDR(key);
+        assert (workerState.get(WorkerAddr));
         try {
             WorkerService workerService = GetServiceByWorkerADDR(WorkerAddr);
             LOG.info("ASSIGN delete " + key + " TO " + WorkerAddr);
@@ -196,11 +199,15 @@ public class Primary implements Watcher, PrimaryService {
         // reassign worker keyrange
         //reuse the interface of SetKeyRange
         try {
-            WorkerService workerService = GetServiceByWorkerADDR(WorkerAddr);
-            LOG.info("resetKeyRange " + WorkerAddr + " TO " + newKeyEnd);
-            checkNewKeyEnd(newKeyEnd, WorkerAddr);
-            workerService.ResetKeyEnd(newKeyEnd, WorkerReceiverADRR);
-            workerkeymap.get(WorkerAddr).set(1, newKeyEnd);
+            synchronized (workerState) {
+                workerState.put(WorkerAddr, false);
+                WorkerService workerService = GetServiceByWorkerADDR(WorkerAddr);
+                LOG.info("resetKeyRange " + WorkerAddr + " TO " + newKeyEnd);
+                checkNewKeyEnd(newKeyEnd, WorkerAddr);
+                workerService.ResetKeyEnd(newKeyEnd, WorkerReceiverADRR);
+                workerkeymap.get(WorkerAddr).set(1, newKeyEnd);
+                workerState.put(WorkerAddr, true);
+            }
             return "OK";
         } catch (Exception e) {
             e.printStackTrace();
@@ -410,6 +417,10 @@ public class Primary implements Watcher, PrimaryService {
                 ScaleOut scaleOut = new ScaleOut();
                 scaleOut.setName("scaleOut" + ScaleOutCounter.addAndGet(1));
                 scaleOut.start();
+
+                if (newWorkerNum > 1) {
+                    LOG.error("scale out >=1 workers is not supported right now.");
+                }
             }
         }
 
