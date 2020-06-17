@@ -101,7 +101,9 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             LOG.info("do datatransfer");
             try {
                 TreeMap<String, String> data = RingoDB.INSTANCE.SplitTreeMap(this.KeyEnd, NewKeyEnd);
-                return GetServiceByWorkerADDR(WorkerReceiverADRR).DoTransfer(data);
+                String res = GetServiceByWorkerADDR(WorkerReceiverADRR).DoTransfer(data);
+                //delete db data
+                return res;
             } catch (RingoDBException e) {
                 e.printStackTrace();
             }

@@ -9,6 +9,9 @@ public class ScaleOutTest {
         client.startZK();
         PrimaryService primaryService = client.PrimaryConnection();
         assertEquals("OK", primaryService.PUT("ringo", "apple"));
+        assertEquals("OK", primaryService.PUT("banana", "banana"));
+        assertEquals("OK", primaryService.PUT("watermelon", "banana"));
+        assertEquals("OK", primaryService.PUT("papaya", "papaya"));
     }
 
     @Test
@@ -19,7 +22,7 @@ public class ScaleOutTest {
         // 存入一些data
         StoreData();
 
-        Thread.sleep(1000);
+        Thread.sleep(2000);
 
         //起1个普通worker
         Config.StartWorker(1);

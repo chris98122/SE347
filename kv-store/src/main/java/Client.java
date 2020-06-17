@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Scanner;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /*
@@ -23,23 +22,22 @@ public class Client implements Watcher {
     protected AtomicInteger countOfRequest = new AtomicInteger(0);
     ZooKeeper zk;
     String hostPort;
-    String masterip;
-    CountDownLatch latch;
-    AsyncCallback.DataCallback readmasterCallback = new AsyncCallback.DataCallback() {
+    volatile String primaryip = null;
+    AsyncCallback.DataCallback readprimaryCallback = new AsyncCallback.DataCallback() {
         @Override
         public void processResult(int rc, String path, Object o, byte[] bytes, Stat stat) {
             switch (KeeperException.Code.get(rc)) {
                 case CONNECTIONLOSS:
-                    zk.getData("/master", false, readmasterCallback, null);
-                    LOG.info("retry get master ip");
+                    zk.getData("/primary", false, readprimaryCallback, null);
+                    LOG.info("retry get primary ip");
                     break;
                 case OK:
-                    masterip = new String(bytes);
-                    LOG.info("get master ip");
+                    primaryip = new String(bytes);
+                    LOG.info("get primary ip " + primaryip);
                     break;
                 case NONODE:
-                    zk.getData("/master", false, readmasterCallback, null);
-                    LOG.info("no node master,retry");
+                    zk.getData("/primary", false, readprimaryCallback, null);
+                    LOG.info("no node primary,retry");
                 default:
                     LOG.error("somthing went wrong" + KeeperException.create(KeeperException.Code.get(rc), path));
             }
@@ -76,12 +74,14 @@ public class Client implements Watcher {
     }
 
     public PrimaryService PrimaryConnection() {
-        zk.getData("/primary", false, readmasterCallback, null);
-
+        zk.getData("/primary", false, readprimaryCallback, null);
+        while (primaryip == null) {
+            //block until get primary ip
+        }
         ConsumerConfig<PrimaryService> consumerConfig = new ConsumerConfig<PrimaryService>()
                 .setInterfaceId(PrimaryService.class.getName()) // 指定接口
                 .setProtocol("bolt") // 指定协议
-                .setDirectUrl("bolt://" + masterip + ":12200") // 指定直连地址
+                .setDirectUrl("bolt://" + primaryip + ":12200") // 指定直连地址
                 .setTimeout(2000);
         // 生成代理类
         PrimaryService primaryService = consumerConfig.refer();
