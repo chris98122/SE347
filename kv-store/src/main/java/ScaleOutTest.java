@@ -34,7 +34,7 @@ public class ScaleOutTest {
         Client client = new Client(Config.zookeeperHost);
         client.startZK();
         PrimaryService primaryService = client.PrimaryConnection();
-        for (Integer i = 0; i < 100000; i++) {
+        for (Integer i = 0; i < 10000; i++) {
             primaryService.PUT(i.toString(), i.toString());
         }
     }

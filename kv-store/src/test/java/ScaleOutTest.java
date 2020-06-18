@@ -55,7 +55,7 @@ public class ScaleOutTest {
         DataTransferService S = w.GetServiceByWorkerADDR(PrivateData.ip + ":12301");
         TreeMap<String, String> m = new TreeMap<>();
 
-        for (Integer i = 0; i < 100000; i++) {
+        for (Integer i = 0; i < 10000; i++) {
             m.put(i.toString(), i.toString());
         }
 
