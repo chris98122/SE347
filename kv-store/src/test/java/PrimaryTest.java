@@ -21,8 +21,8 @@ public class PrimaryTest {
                     }
             ).start();
         }
-        String args[] = {Config.zookeeperHost, "1"};
-        Primary m = new Primary(args[0]);
+        String args[] = {Config.zookeeperHost, "127.0.0.1"};
+        Primary m = new Primary(args[0],args[1]);
         m.startZK();
         m.runForPrimary();
         if (m.isLeader) {
