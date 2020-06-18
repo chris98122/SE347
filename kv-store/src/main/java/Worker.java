@@ -83,6 +83,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             return RingoDB.INSTANCE.hasValueInRange(start, end);
         } catch (RingoDBException e) {
             e.printStackTrace();
+            LOG.error(String.valueOf(e));
         }
         return false;
     }
@@ -95,6 +96,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             return "OK";
         } catch (RingoDBException e) {
             e.printStackTrace();
+            LOG.error(String.valueOf(e));
         }
         return "ERR";
     }
@@ -177,6 +179,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             return "OK";
         } catch (RingoDBException e) {
             e.printStackTrace();
+            LOG.error(String.valueOf(e));
         }
         return "ERR";
     }
@@ -189,6 +192,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             return res;
         } catch (RingoDBException e) {
             e.printStackTrace();
+            LOG.error(String.valueOf(e));
             if (e.getMessage().equals("key not exists")) {
                 return "NO KEY";
             }
@@ -204,6 +208,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             return "OK";
         } catch (RingoDBException e) {
             e.printStackTrace();
+            LOG.error(String.valueOf(e));
             if (e.getMessage().equals("key not exists")) {
                 return "NO KEY";
             }
@@ -230,6 +235,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             providerConfig.export(); // 发布服务
         } catch (Exception e) {
             e.printStackTrace();
+            LOG.error(String.valueOf(e));
         }
     }
 
@@ -249,6 +255,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             providerConfig.export(); // 发布服务
         } catch (Exception e) {
             e.printStackTrace();
+            LOG.error(String.valueOf(e));
         }
     }
 
