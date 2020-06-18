@@ -3,7 +3,7 @@ public class Config {
 
     static public void StartPrimary() {
         //起primary
-        String args[] = {Config.zookeeperHost, "1"};
+        String args[] = {Config.zookeeperHost, PrivateData.ip};
         Thread runm = new Thread(
                 () ->
                 {
