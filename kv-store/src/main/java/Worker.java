@@ -5,6 +5,7 @@ import com.alipay.sofa.rpc.config.ProviderConfig;
 import com.alipay.sofa.rpc.config.ServerConfig;
 import lib.DataTransferService;
 import lib.WorkerService;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.zookeeper.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,9 +70,16 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
     }
 
+    public static Integer Hash(String string) {
+        //加密后的字符串
+        String encodeStr = DigestUtils.md5Hex(string);
+        //System.out.println("MD5加密后的字符串为:encodeStr="+encodeStr);
+        return encodeStr.hashCode();
+    }
+
     boolean checkNeedDataTransfer(String start, String end) {
         try {
-            LOG.info("checkNeedDataTransfer: " + start + " " + end);
+            LOG.info("checkNeedDataTransfer: " + Hash(start) + " " + Hash(end));
             return RingoDB.INSTANCE.hasValueInRange(start, end);
         } catch (RingoDBException e) {
             e.printStackTrace();
@@ -103,7 +111,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     .setInterfaceId(DataTransferService.class.getName()) // 指定接口
                     .setProtocol("bolt") // 指定协议
                     .setDirectUrl("bolt://" + workerip + ":" + port) // 指定直连地址
-                    .setTimeout(20000)
+                    .setTimeout(2000)
                     .setRepeatedReferLimit(30); //允许同一interface，同一uniqueId，不同server情况refer 30次，用于单机调试
 
         } catch (Exception e) {
@@ -114,21 +122,22 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     }
 
     @Override
-    public String ResetKeyEnd(String NewKeyEnd, String WorkerReceiverADRR) {
-        LOG.info("ready ResetKeyEnd to " + NewKeyEnd);
-        if (checkNeedDataTransfer(NewKeyEnd, this.KeyEnd)) {
+    public String ResetKeyEnd(String oldKeyEnd, String NewKeyEnd, String WorkerReceiverADRR) {
+        LOG.info("ready ResetKeyEnd to " + Hash(NewKeyEnd));
+        if (checkNeedDataTransfer(NewKeyEnd, oldKeyEnd)) {
             try {
-                TreeMap<String, String> data = RingoDB.INSTANCE.SplitTreeMap(this.KeyEnd, NewKeyEnd);
+                TreeMap<String, String> data = RingoDB.INSTANCE.SplitTreeMap(NewKeyEnd, oldKeyEnd);
                 LOG.info("do datatransfer: " + data);
                 String res = GetServiceByWorkerADDR(WorkerReceiverADRR).DoTransfer(data);
                 //delete db data
                 return res;
             } catch (Exception e) {
+                e.printStackTrace();
                 LOG.error(String.valueOf(e));
             }
         } else {
             LOG.info("no need for datatransfer");
-            this.KeyEnd = NewKeyEnd;
+            this.KeyEnd = Hash(NewKeyEnd).toString();
             return "OK";
         }
         return "ERR";

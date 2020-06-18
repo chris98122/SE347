@@ -5,7 +5,7 @@ public interface WorkerService {
     //should be registeed in Worker.java
     String SetKeyRange(String keystart, String keyend, boolean dataTranfer);
 
-    String ResetKeyEnd(String keyend, String WorkerReceiverADRR);
+    String ResetKeyEnd(String oldKeyEnd, String NewKeyEnd, String WorkerReceiverADRR);
 
     String PUT(String key, String value);
 

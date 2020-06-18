@@ -192,19 +192,35 @@ public class Primary implements Watcher, PrimaryService {
         }
     }
 
-    String resetKeyRange(String newKeyEnd, String WorkerAddr, String WorkerReceiverADRR) {
+    String resetKeyRange(String newKeyEnd, String WorkerSenderAddr, String WorkerReceiverADRR) {
         // block until the data transfer is done
         // reassign worker keyrange
         //reuse the interface of SetKeyRange
         try {
             synchronized (workerState) {
-                workerState.put(WorkerAddr, false);
-                WorkerService workerService = GetServiceByWorkerADDR(WorkerAddr);
-                LOG.info("resetKeyRange " + WorkerAddr + " TO " + newKeyEnd);
-                checkNewKeyEnd(newKeyEnd, WorkerAddr);
-                workerService.ResetKeyEnd(newKeyEnd, WorkerReceiverADRR);
-                workerkeymap.get(WorkerAddr).set(1, newKeyEnd);
-                workerState.put(WorkerAddr, true);
+                workerState.put(WorkerSenderAddr, false);
+                WorkerService workerService = GetServiceByWorkerADDR(WorkerSenderAddr);
+                LOG.info("resetKeyRange " + WorkerSenderAddr + " TO " + newKeyEnd);
+                checkNewKeyEnd(newKeyEnd, WorkerSenderAddr);
+
+                // send unhashed string ,e.g 127.0.0.1:12000
+                String UnhashedOldKeyEnd = null;
+                // use workermap to find  UnhashedOldKeyEnd
+                // workermap stores startKey --> workerAddr mapping
+                Iterator iterator = workermap.keySet().iterator();
+                Integer keyStart = null;
+
+                while (iterator.hasNext()) {
+                    keyStart = (Integer) iterator.next();
+                    if (workerkeymap.get(WorkerSenderAddr).get(0).equals(keyStart.toString())) {
+                        UnhashedOldKeyEnd = workermap.get(keyStart);
+                        break;
+                    }
+                }
+                assert UnhashedOldKeyEnd != null;
+                workerService.ResetKeyEnd(UnhashedOldKeyEnd, WorkerReceiverADRR, WorkerReceiverADRR);
+                workerkeymap.get(WorkerSenderAddr).set(1, newKeyEnd);
+                workerState.put(WorkerSenderAddr, true);
             }
             return "OK";
         } catch (Exception e) {

@@ -11,7 +11,7 @@ import static org.junit.Assert.assertEquals;
 public class ScaleOutTest {
     public static void main(String[] args) throws Exception, MWException {
         // TwoWorkerAddTest();
-        LargeDataTransferTest();
+        LargeDataTransferTest(100);
     }
 
     static void StoreData() throws Exception {
@@ -30,22 +30,22 @@ public class ScaleOutTest {
         assertEquals("OK", primaryService.PUT("pineapple", "pineapple"));
     }
 
-    static void StoreLargeData() throws Exception {
+    static void StoreLargeData(int datasize) throws Exception {
         Client client = new Client(Config.zookeeperHost);
         client.startZK();
         PrimaryService primaryService = client.PrimaryConnection();
-        for (Integer i = 0; i < 10000; i++) {
+        for (Integer i = 0; i < datasize; i++) {
             primaryService.PUT(i.toString(), i.toString());
         }
     }
 
     @Test
-    public static void LargeDataTransferTest() throws Exception, MWException {
+    public static void LargeDataTransferTest(int datasize) throws Exception, MWException {
         Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
         Thread.sleep(12000);
 
         // 存入大量data
-        StoreLargeData();
+        StoreLargeData(datasize);
 
         //起1个普通worker
         Config.StartWorker(1);

@@ -5,6 +5,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.util.Comparator;
+import java.util.SortedMap;
 import java.util.TreeMap;
 
 
@@ -13,7 +15,7 @@ public enum RingoDB implements DB {
 
     private static final Logger LOG = LoggerFactory.getLogger(RingoDB.class);
     static Integer snapshot_version = 0;
-    TreeMap<String, String> map = new TreeMap<String, String>();
+    TreeMap<String, String> map = new TreeMap<String, String>(new KeyComparator());
     String SNAPSHOT_DIR = "./";
 
     public static Integer Hash(String string) {
@@ -51,18 +53,26 @@ public enum RingoDB implements DB {
     public synchronized boolean hasValueInRange(String keyStart, String KeyEnd) throws RingoDBException {
         checkKey(keyStart);
         checkKey(KeyEnd);
-        for (String key : map.keySet()) {
-            if (inRange(key, keyStart, KeyEnd)) {
-                return true;
+        int keystart = Hash(keyStart);
+        int keyend = Hash(KeyEnd);
+        if (keystart < keyend) {
+            LOG.info("submap" + map.subMap(keyStart, KeyEnd));
+            return map.subMap(keyStart, KeyEnd).size() >= 1;
+        }
+        if (keystart > keyend) {
+            for (String key : map.keySet()) {
+                int newkey = Hash(key);
+                return newkey >= keystart || newkey < keyend;
             }
         }
+        //map.subMap(K startKey，K endKey)方法用于返回由参数中指定范围的键定义的映射的部分或部分
 
         return false;
     }
 
     private boolean inRange(String key, String keyStart, String KeyEnd) {
-        int keystart = Integer.parseInt(keyStart);
-        int keyend = Integer.parseInt(KeyEnd);
+        int keystart = Hash(keyStart);
+        int keyend = Hash(KeyEnd);
         int newkey = Hash(key);
         if (keystart < keyend) {
             return newkey >= keystart && newkey < keyend;
@@ -74,11 +84,20 @@ public enum RingoDB implements DB {
     }
 
     public TreeMap<String, String> SplitTreeMap(String keyStart, String KeyEnd) throws RingoDBException {
-        TreeMap<String, String> res = new TreeMap<>();
-
-        for (String key : map.keySet()) {
-            if (inRange(key, keyStart, KeyEnd)) {
-                res.put(key, map.get(key));
+        TreeMap<String, String> res = null;
+        int keystart = Hash(keyStart);
+        int keyend = Hash(KeyEnd);
+        if (keystart < keyend) {
+            SortedMap<String, String> s = map.subMap(keyStart, KeyEnd);
+            res = new TreeMap<>(s);
+            return res;
+        }
+        if (keystart > keyend) {
+            res = new TreeMap<String, String>(new KeyComparator());
+            for (String key : map.keySet()) {
+                if (inRange(key, keyStart, KeyEnd)) {
+                    res.put(key, map.get(key));
+                }
             }
         }
         return res;
@@ -95,7 +114,6 @@ public enum RingoDB implements DB {
         snapshot_version++;
         return "snapshot-" + snapshot_version.toString();
     }
-
 
     String get_snapshot_name() {
         File dir = new File(SNAPSHOT_DIR); //要遍历的目录
@@ -165,6 +183,15 @@ public enum RingoDB implements DB {
     private void checkKey(String key) throws RingoDBException {
         if (key == null) {
             throw new RingoDBException("key is empty");
+        }
+    }
+
+    class KeyComparator implements Comparator<String>//比较器
+    {
+        @Override
+        public int compare(String o1, String o2) {
+            assert (o1 != null && o2 != null);
+            return new Integer(Hash(o1)).compareTo(Hash(o2));
         }
     }
     //to use RingoDB just call RingoDB.INSTANCE. flush()

@@ -25,13 +25,27 @@ public class ScaleOutTest {
         assertEquals("OK", primaryService.PUT("pineapple", "pineapple"));
     }
 
-    static void StoreLargeData() throws Exception {
+    static void StoreLargeData(Integer datasize) throws Exception {
         Client client = new Client(Config.zookeeperHost);
         client.startZK();
         PrimaryService primaryService = client.PrimaryConnection();
-        for (Integer i = 0; i < 100000; i++) {
+        for (Integer i = 0; i < datasize; i++) {
             primaryService.PUT(i.toString(), i.toString());
         }
+    }
+
+    @Test
+    public void FullLargeDataTransferTest() throws Exception, MWException {
+        Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
+        Thread.sleep(12000);
+
+        // 存入大量data
+        StoreLargeData(100);
+
+        //起1个普通worker
+        Config.StartWorker(1);
+        Thread.sleep(30000);
+
     }
 
     @Test
@@ -55,7 +69,7 @@ public class ScaleOutTest {
         DataTransferService S = w.GetServiceByWorkerADDR(PrivateData.ip + ":12301");
         TreeMap<String, String> m = new TreeMap<>();
 
-        for (Integer i = 0; i < 10000; i++) {
+        for (Integer i = 0; i < 100; i++) {
             m.put(i.toString(), i.toString());
         }
 
