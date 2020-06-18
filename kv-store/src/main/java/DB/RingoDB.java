@@ -48,6 +48,7 @@ public enum RingoDB implements DB {
     public void setMap(TreeMap<String, String> data) throws RingoDBException {
         assert map.isEmpty();
         map = data;
+        printDBContent();
     }
 
     public synchronized boolean hasValueInRange(String keyStart, String KeyEnd) throws RingoDBException {
@@ -70,17 +71,39 @@ public enum RingoDB implements DB {
         return false;
     }
 
+    private void printDBContent() {
+        LOG.info(String.valueOf(map));
+    }
+
     private boolean inRange(String key, String keyStart, String KeyEnd) {
         int keystart = Hash(keyStart);
         int keyend = Hash(KeyEnd);
         int newkey = Hash(key);
+        assert (keystart > keyend);
+        return newkey >= keystart || newkey < keyend;
+    }
+
+    public void TrunkTreeMap(String keyStart, String KeyEnd) throws RingoDBException {
+        //save keyStart->KeyEnd
+        int keystart = Hash(keyStart);
+        int keyend = Hash(KeyEnd);
+        LOG.info("TrunkTreeMap" + keystart + " " + keyend);
         if (keystart < keyend) {
-            return newkey >= keystart && newkey < keyend;
+            SortedMap<String, String> s = map.headMap(KeyEnd);
+            LOG.info("HEAD MAP" + s);
+            map.clear();
+            map = new TreeMap<String, String>(s);
         }
         if (keystart > keyend) {
-            return newkey >= keystart || newkey < keyend;
+            TreeMap newmap = new TreeMap<String, String>(new KeyComparator());
+            for (String key : map.keySet()) {
+                if (inRange(key, keyStart, KeyEnd)) {
+                    newmap.put(key, map.get(key));
+                }
+            }
+            map = newmap;
         }
-        return false;
+        printDBContent();
     }
 
     public TreeMap<String, String> SplitTreeMap(String keyStart, String KeyEnd) throws RingoDBException {

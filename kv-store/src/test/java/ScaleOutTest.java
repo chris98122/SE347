@@ -25,28 +25,49 @@ public class ScaleOutTest {
         assertEquals("OK", primaryService.PUT("pineapple", "pineapple"));
     }
 
-    static void StoreLargeData(Integer datasize) throws Exception {
+    static void StoreLargeData(Integer start, Integer datasize) throws Exception {
         Client client = new Client(Config.zookeeperHost);
         client.startZK();
         PrimaryService primaryService = client.PrimaryConnection();
-        for (Integer i = 0; i < datasize; i++) {
+        for (Integer i = start; i < start + datasize; i++) {
             primaryService.PUT(i.toString(), i.toString());
         }
     }
 
     @Test
-    public void FullLargeDataTransferTest() throws Exception, MWException {
+    public void FullScaleOutOneWorkerTest() throws Exception, MWException {
         Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
         Thread.sleep(12000);
 
         // 存入大量data
-        StoreLargeData(100);
+        StoreLargeData(0,100);
 
         //起1个普通worker
         Config.StartWorker(1);
-        Thread.sleep(30000);
 
+        Thread.sleep(3000);
+        StoreLargeData(101,200);
+        Thread.sleep(3000);
     }
+
+    @Test
+    public void FullScaleOutTwoWorkerTest() throws Exception, MWException {
+        Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
+        Thread.sleep(12000);
+
+        // 存入大量data
+        StoreLargeData(0,100);
+
+        //起2个普通worker
+        Config.StartWorker(1);
+
+        Config.StartWorker(2);
+
+        Thread.sleep(3000);
+        StoreLargeData(101,200);
+        Thread.sleep(3000);
+    }
+
 
     @Test
     public void LargeDataTransferTest() throws Exception, MWException {
@@ -74,37 +95,7 @@ public class ScaleOutTest {
         }
 
         S.DoTransfer(m);
-        Thread.sleep(2000);
-    }
-
-    @Test
-    public void TwoWorkerAddTest() throws Exception, MWException {
-        Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
-        Thread.sleep(12000);
-
-        // 存入一些data
-        StoreData();
-
-        //起2个普通worker
-        Config.StartWorker(1);
-        Thread.sleep(2000);
-        Config.StartWorker(2);
-        Thread.sleep(30000);
-    }
-
-    @Test
-    public void OneWorkerAddTest() throws Exception, MWException {
-        Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
-        Thread.sleep(12000);
-
-        // 存入一些data
-        StoreData();
-
-        Thread.sleep(2000);
-
-        //起1个普通worker
-        Config.StartWorker(1);
-        Thread.sleep(30000);
+        Thread.sleep(200);
     }
 
     @Test

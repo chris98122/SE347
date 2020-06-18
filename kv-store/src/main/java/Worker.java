@@ -132,6 +132,8 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 LOG.info("do datatransfer: " + data);
                 String res = GetServiceByWorkerADDR(WorkerReceiverADRR).DoTransfer(data);
                 //delete db data
+                if (res.equals("OK"))
+                    RingoDB.INSTANCE.TrunkTreeMap(this.serverId, NewKeyEnd);
                 return res;
             } catch (Exception e) {
                 e.printStackTrace();
@@ -162,6 +164,10 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             }
         }
         if (dataTranfer) {
+            //set KeyRange
+            this.KeyStart = keystart;
+            this.KeyEnd = keyend;
+            LOG.info(serverId + ":" + keystart + " " + keyend);
             // register as RPC Server
             registerDataTransferService();
             LOG.info(serverId + " resgistered data transfer Service");
@@ -171,13 +177,28 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         return "ERR";
     }
 
+    private void checkKeyRange(String keyString) throws MWException {
+        int hashvalue = Hash(keyString);
+        if (hashvalue >= Integer.parseInt(this.KeyStart) && hashvalue < Integer.parseInt(this.KeyEnd)) {
+            {
+
+            }
+        } else if ((hashvalue < Integer.parseInt(this.KeyEnd) | hashvalue >= Integer.parseInt(this.KeyStart)) && Integer.parseInt(this.KeyStart) > Integer.parseInt(this.KeyEnd)) {
+            {
+            }
+        } else {
+            throw new MWException("Dispatch wrong key to worker");
+        }
+    }
+
     @Override
     public String PUT(String key, String value) {
         try {
+            checkKeyRange(key);
             RingoDB.INSTANCE.Put(key, value);
             LOG.info("[DB EXECUTION]put" + key + ":" + value);
             return "OK";
-        } catch (RingoDBException e) {
+        } catch (RingoDBException | MWException e) {
             e.printStackTrace();
             LOG.error(String.valueOf(e));
         }
@@ -187,6 +208,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     @Override
     public String GET(String key) {
         try {
+            checkKeyRange(key);
             String res = RingoDB.INSTANCE.Get(key);
             LOG.info("[DB EXECUTION] GET" + key + "value:" + res);
             return res;
@@ -196,6 +218,9 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             if (e.getMessage().equals("key not exists")) {
                 return "NO KEY";
             }
+        } catch (MWException e) {
+            e.printStackTrace();
+            LOG.error(String.valueOf(e));
         }
         return "ERR";
     }
@@ -203,6 +228,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     @Override
     public String DELETE(String key) {
         try {
+            checkKeyRange(key);
             RingoDB.INSTANCE.Delete(key);
             LOG.info("[DB EXECUTION] delete" + key);
             return "OK";
@@ -212,6 +238,9 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             if (e.getMessage().equals("key not exists")) {
                 return "NO KEY";
             }
+        } catch (MWException e) {
+            e.printStackTrace();
+            LOG.error(String.valueOf(e));
         }
         return "ERR";
     }

@@ -10,7 +10,6 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -62,6 +61,26 @@ public class Primary implements Watcher, PrimaryService {
             }
         }
     };
+    AsyncCallback.ChildrenCallback workerGetChildrenCallback = new AsyncCallback.ChildrenCallback() {
+        @Override
+        public void processResult(int rc, String path, Object ctx, List<String> children) {
+            switch (KeeperException.Code.get(rc)) {
+                case CONNECTIONLOSS:
+                    try {
+                        LOG.info("retry get workers");
+                        getWorkers();
+                    } catch (KeeperException | InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    break;
+                case OK:
+                    LOG.info("Successfully got a list of workers:" + children.size() + "workers");
+                    break;
+                default:
+                    LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
+            }
+        }
+    };
     //主节点等待从节点的变化（包括worker node fail 或者 增加）
     //ZooKeeper客户端也可以通过getData，getChildren和exist三个接口来向ZooKeeper服务器注册Watcher
     Watcher workersChangeWatcher = new Watcher() {
@@ -85,28 +104,8 @@ public class Primary implements Watcher, PrimaryService {
             }
         }
     };
-    AsyncCallback.ChildrenCallback workerGetChildrenCallback = new AsyncCallback.ChildrenCallback() {
-        @Override
-        public void processResult(int rc, String path, Object ctx, List<String> children) {
-            switch (KeeperException.Code.get(rc)) {
-                case CONNECTIONLOSS:
-                    try {
-                        LOG.info("retry get workers");
-                        getWorkers();
-                    } catch (KeeperException | InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    break;
-                case OK:
-                    LOG.info("Successfully got a list of workers:" + children.size() + "workers");
-                    break;
-                default:
-                    LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
-            }
-        }
-    };
 
-    Primary(String hostPort,String ip) throws UnknownHostException {
+    Primary(String hostPort, String ip) throws UnknownHostException {
         this.hostPort = hostPort;
         serverId = ip;
         isLeader = false;
@@ -114,7 +113,7 @@ public class Primary implements Watcher, PrimaryService {
 
     public static void main(String[] args)
             throws Exception {
-        Primary m = new Primary(args[0],args[1]);
+        Primary m = new Primary(args[0], args[1]);
         m.startZK();
         m.runForPrimary();
         if (isLeader) {
@@ -432,7 +431,13 @@ public class Primary implements Watcher, PrimaryService {
                 scaleOut.start();
 
                 if (newWorkerNum > 1) {
-                    LOG.error("scale out >=1 workers is not supported right now.");
+                    try {
+                        getWorkers();
+                    } catch (KeeperException e) {
+                        e.printStackTrace();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
         }
