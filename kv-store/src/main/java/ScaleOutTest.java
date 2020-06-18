@@ -49,7 +49,8 @@ public class ScaleOutTest {
 
         //起1个普通worker
         Config.StartWorker(1);
-        Thread.sleep(30000);
+        while (true)
+            Thread.sleep(3000);
     }
 
     @Test
