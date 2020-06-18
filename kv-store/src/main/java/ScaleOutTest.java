@@ -9,8 +9,9 @@ import java.util.TreeMap;
 import static org.junit.Assert.assertEquals;
 
 public class ScaleOutTest {
-    public static void main(String args[]) throws Exception, MWException {
-        TwoWorkerAddTest();
+    public static void main(String[] args) throws Exception, MWException {
+        // TwoWorkerAddTest();
+        LargeDataTransferTest();
     }
 
     static void StoreData() throws Exception {
@@ -27,6 +28,28 @@ public class ScaleOutTest {
         assertEquals("OK", primaryService.PUT("peach", "peach"));
         assertEquals("OK", primaryService.PUT("melon", "melon"));
         assertEquals("OK", primaryService.PUT("pineapple", "pineapple"));
+    }
+
+    static void StoreLargeData() throws Exception {
+        Client client = new Client(Config.zookeeperHost);
+        client.startZK();
+        PrimaryService primaryService = client.PrimaryConnection();
+        for (Integer i = 0; i < 100000; i++) {
+            primaryService.PUT(i.toString(), i.toString());
+        }
+    }
+
+    @Test
+    public static void LargeDataTransferTest() throws Exception, MWException {
+        Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
+        Thread.sleep(12000);
+
+        // 存入大量data
+        StoreLargeData();
+
+        //起1个普通worker
+        Config.StartWorker(1);
+        Thread.sleep(30000);
     }
 
     @Test

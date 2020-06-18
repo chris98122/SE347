@@ -9,10 +9,6 @@ import java.util.TreeMap;
 import static org.junit.Assert.assertEquals;
 
 public class ScaleOutTest {
-    public static void main(String args[]) throws Exception, MWException {
-        TwoWorkerAddTest();
-    }
-
     static void StoreData() throws Exception {
         Client client = new Client(Config.zookeeperHost);
         client.startZK();
@@ -29,8 +25,46 @@ public class ScaleOutTest {
         assertEquals("OK", primaryService.PUT("pineapple", "pineapple"));
     }
 
+    static void StoreLargeData() throws Exception {
+        Client client = new Client(Config.zookeeperHost);
+        client.startZK();
+        PrimaryService primaryService = client.PrimaryConnection();
+        for (Integer i = 0; i < 100000; i++) {
+            primaryService.PUT(i.toString(), i.toString());
+        }
+    }
+
     @Test
-    public static void TwoWorkerAddTest() throws Exception, MWException {
+    public void LargeDataTransferTest() throws Exception, MWException {
+        Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
+        Thread.sleep(12000);
+
+        String workerargs[] = {Config.zookeeperHost, PrivateData.ip, "12302"};
+        Worker w = new Worker(workerargs[0], workerargs[1], workerargs[2]);
+        w.registerRPCServices();
+
+        ConsumerConfig<WorkerService> consumerConfig = new ConsumerConfig<WorkerService>()
+                .setInterfaceId(WorkerService.class.getName()) // 指定接口
+                .setProtocol("bolt") // 指定协议
+                .setDirectUrl("bolt://" + PrivateData.ip + ":12301") // 指定直连地址
+                .setTimeout(2000)
+                .setRepeatedReferLimit(30); //允许同一interface，同一uniqueId，不同server情况refer 30次，用于单机调试
+
+        consumerConfig.refer().PUT("ringo", "apple");
+        consumerConfig.refer().DELETE("ringo");
+        DataTransferService S = w.GetServiceByWorkerADDR(PrivateData.ip + ":12301");
+        TreeMap<String, String> m = new TreeMap<>();
+
+        for (Integer i = 0; i < 100000; i++) {
+            m.put(i.toString(), i.toString());
+        }
+
+        S.DoTransfer(m);
+        Thread.sleep(2000);
+    }
+
+    @Test
+    public void TwoWorkerAddTest() throws Exception, MWException {
         Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
         Thread.sleep(12000);
 

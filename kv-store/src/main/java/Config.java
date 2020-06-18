@@ -15,6 +15,7 @@ public class Config {
                 }
         );
         runm.setName("primary");
+        runm.setDaemon(true);
         runm.start();
     }
 
@@ -37,6 +38,7 @@ public class Config {
                 }
         );
         t.setName("worker" + workerID);
+        t.setDaemon(true);
         t.start();
     }
 
@@ -53,6 +55,7 @@ public class Config {
                 }
         );
         t.setName("worker" + workerID);
+        t.setDaemon(true);
         t.start();
     }
 }
