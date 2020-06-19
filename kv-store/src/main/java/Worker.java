@@ -73,6 +73,15 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         w.registerToZookeeper();
         // if the worker is a new one, master should call rpc SetKeyRange(startKey,endKey,true)
 
+        // 等60秒，如果没有收到setKeyRange()就重新连接zookeeper
+        TimeUnit.MINUTES.sleep(1);
+        while(w.KeyStart == null)
+        {
+            LOG.warn("the scale out is not started,retry");
+            w.zk.close();
+            w.registerToZookeeper();
+        }
+
         int snapshotcounter = 0;
         while (true) {
             TimeUnit.HOURS.sleep(1);//一小时snapshot一次

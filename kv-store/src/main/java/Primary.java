@@ -33,7 +33,6 @@ public class Primary implements Watcher, PrimaryService {
     // stores startKey --> workerAddr mapping
     // startKey is Hash(workerAddr)
     // e.g -399182218 -->  212.64.64.185:12201
-    // NOT USED SINCE INITIAL HASH WORKERS, MAY CHANGE TO LOCAL VARIABLE
 
     TreeMap<String, ArrayList<String>> workerkeymap = new TreeMap<>();
     // stores workerAddr --> [KeyStart, KeyEnd] mapping
@@ -103,7 +102,7 @@ public class Primary implements Watcher, PrimaryService {
                 try {
                     /*如果在重新注册watcher的时间里发生了"/worker"的变化
                     1. worker fail ：之后讨论
-                    2. new worker add :解决方法是new worker 60秒内都没有收到setKeyRange()就打个LOG然后等运维手动重启
+                    2. new worker add :解决方法是new worker 60秒内都没有收到setKeyRange()就重新连接zookeeper
                     */
                     getWorkers();//watcher是一次性的所以必须再次注册
                     //客户端 Watcher 回调的过程是一个串行同步的过程，所以另开线程处理
