@@ -91,6 +91,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     @Override
     public String DoTransfer(TreeMap<String, String> data) {
         LOG.info("DoTransfer" + String.valueOf(data));
+
         try {
             RingoDB.INSTANCE.setMap(data);
             return "OK";
@@ -129,6 +130,8 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         if (checkNeedDataTransfer(NewKeyEnd, oldKeyEnd)) {
             try {
                 TreeMap<String, String> data = RingoDB.INSTANCE.SplitTreeMap(NewKeyEnd, oldKeyEnd);
+
+                LOG.info(String.valueOf(data.comparator().getClass()));
                 LOG.info("do datatransfer: " + data);
                 String res = GetServiceByWorkerADDR(WorkerReceiverADRR).DoTransfer(data);
                 //delete db data

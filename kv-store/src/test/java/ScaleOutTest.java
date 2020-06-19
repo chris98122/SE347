@@ -34,6 +34,15 @@ public class ScaleOutTest {
         }
     }
 
+    static void GETLargeData(Integer start, Integer datasize) throws Exception {
+        Client client = new Client(Config.zookeeperHost);
+        client.startZK();
+        PrimaryService primaryService = client.PrimaryConnection();
+        for (Integer i = start; i < start + datasize; i++) {
+            primaryService.GET(i.toString());
+        }
+    }
+
     @Test
     public void ScaleOutOneWorkerTest() throws Exception, MWException {
         Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
@@ -51,40 +60,23 @@ public class ScaleOutTest {
     }
 
     @Test
-    public void ScaleOutTwoWorkerTest() throws Exception, MWException {
+    public void ScaleOutWorkerTest() throws Exception, MWException {
         Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
         Thread.sleep(12000);
 
         // 存入大量data
         StoreLargeData(0, 100);
 
-        //起2个普通worker
+        //起1个普通worker
         Config.StartWorker(1);
 
-        Config.StartWorker(2);
+        //因为DB是单例模式 所以不能起线程得起WORKER 进程
+        //手动起两个worker进程
 
-        Thread.sleep(3000);
-    }
-
-    @Test
-    public void ScaleOutFourWorkerTest() throws Exception, MWException {
-        Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
+        //持续在ScaleOut 过程中GET DATA
+        GETLargeData(0, 100);
         Thread.sleep(12000);
 
-        // 存入大量data
-        StoreLargeData(0, 100);
-
-        //起2个普通worker
-        Config.StartWorker(1);
-
-        Config.StartWorker(2);
-
-        Thread.sleep(3000);
-
-        Config.StartWorker(1);
-
-        Config.StartWorker(2);
-        Thread.sleep(3000);
     }
 
     @Test

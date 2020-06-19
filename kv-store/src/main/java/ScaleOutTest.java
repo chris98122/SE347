@@ -3,32 +3,43 @@ import org.junit.Test;
 
 public class ScaleOutTest {
     public static void main(String[] args) throws Exception, MWException {
-        // TwoWorkerAddTest();
-        LargeDataTransferTest(100);
     }
 
 
-    static void StoreLargeData(int datasize) throws Exception {
+    static void StoreLargeData(Integer start, Integer datasize) throws Exception {
         Client client = new Client(Config.zookeeperHost);
         client.startZK();
         PrimaryService primaryService = client.PrimaryConnection();
-        for (Integer i = 0; i < datasize; i++) {
+        for (Integer i = start; i < start + datasize; i++) {
             primaryService.PUT(i.toString(), i.toString());
         }
     }
 
+
+    static void GETLargeData(Integer start, Integer datasize) throws Exception {
+        Client client = new Client(Config.zookeeperHost);
+        client.startZK();
+        PrimaryService primaryService = client.PrimaryConnection();
+        for (Integer i = start; i < start + datasize; i++) {
+            primaryService.GET(i.toString());
+        }
+    }
+
     @Test
-    public static void LargeDataTransferTest(int datasize) throws Exception, MWException {
+    public void ScaleOutWorkerTest() throws Exception, MWException {
         Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
         Thread.sleep(12000);
 
-        // 存入大量data
-        StoreLargeData(datasize);
+        // 存入data
+        StoreLargeData(0, 100);
 
-        //起1个普通worker
-        Config.StartWorker(1);
-        while (true)
-            Thread.sleep(3000);
+        //因为DB是单例模式 所以不能起线程得起 WORKER 进程
+        //在testScaleOut.sh起两个worker进程
+
+        //持续在ScaleOut 过程中GET DATA
+        GETLargeData(0, 100);
+        Thread.sleep(12000);
+        //primary线程退出
+
     }
-
 }
