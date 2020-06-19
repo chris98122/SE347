@@ -39,9 +39,10 @@ public class Primary implements Watcher, PrimaryService {
 
     HashMap<String, ConsumerConfig<WorkerService>> workerConsumerConfigHashMap = new HashMap<String, ConsumerConfig<WorkerService>>();
     // stores workerAddr -->ConsumerConfig mapping
-    HashMap<String, Boolean> workerState = new HashMap<>();
-
+    HashMap<String, WORKERSTATE> workerState = new HashMap<>();
     List<String> workerlist = null;
+    // 保存最新一次获取的workers
+
     AsyncCallback.StringCallback createParentCallback = new AsyncCallback.StringCallback() {
         @Override
         public void processResult(int rc, String path, Object ctx, String name) {
@@ -75,6 +76,7 @@ public class Primary implements Watcher, PrimaryService {
                     break;
                 case OK:
                     LOG.info("Successfully got a list of workers:" + children.size() + "workers");
+                    LOG.info(String.valueOf(children));
                     break;
                 default:
                     LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
@@ -141,11 +143,16 @@ public class Primary implements Watcher, PrimaryService {
     @Override
     public String PUT(String key, String value) {
         String WorkerAddr = getWorkerADDR(key);
-        assert (workerState.get(WorkerAddr));
         try {
             WorkerService workerService = GetServiceByWorkerADDR(WorkerAddr);
             LOG.info("ASSIGN PUT " + key + ":" + value + " TO " + WorkerAddr);
-            return workerService.PUT(key, value);
+            synchronized (workerState) {
+                while (!workerState.get(WorkerAddr).equals(WORKERSTATE.READWRITE)) {
+                    //spin
+                    LOG.info(WorkerAddr + "can not put");
+                }
+                return workerService.PUT(key, value);
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -155,11 +162,15 @@ public class Primary implements Watcher, PrimaryService {
     @Override
     public String GET(String key) {
         String WorkerAddr = getWorkerADDR(key);
-        assert (workerState.get(WorkerAddr));
         try {
             WorkerService workerService = GetServiceByWorkerADDR(WorkerAddr);
             LOG.info("ASSIGN GET " + key + " TO " + WorkerAddr);
-            return workerService.GET(key);
+            synchronized (workerState) {
+                while (workerState.get(WorkerAddr).equals(WORKERSTATE.FAIL)) {
+                    LOG.info(WorkerAddr + "can not GET");
+                }
+                return workerService.GET(key);
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -169,11 +180,16 @@ public class Primary implements Watcher, PrimaryService {
     @Override
     public String DELETE(String key) {
         String WorkerAddr = getWorkerADDR(key);
-        assert (workerState.get(WorkerAddr));
         try {
             WorkerService workerService = GetServiceByWorkerADDR(WorkerAddr);
             LOG.info("ASSIGN delete " + key + " TO " + WorkerAddr);
-            return workerService.DELETE(key);
+            synchronized (workerState) {
+                while (!workerState.get(WorkerAddr).equals(WORKERSTATE.READWRITE)) {
+                    //spin
+                    LOG.info(WorkerAddr + "can not delete");
+                }
+                return workerService.DELETE(key);
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -195,29 +211,33 @@ public class Primary implements Watcher, PrimaryService {
         // reassign worker keyrange
         //reuse the interface of SetKeyRange
         try {
-            synchronized (workerState) {
-                workerState.put(WorkerSenderAddr, false);
-                WorkerService workerService = GetServiceByWorkerADDR(WorkerSenderAddr);
-                LOG.info("resetKeyRange " + WorkerSenderAddr + " TO " + newKeyEnd);
-                checkNewKeyEnd(newKeyEnd, WorkerSenderAddr);
+            WorkerService workerService = GetServiceByWorkerADDR(WorkerSenderAddr);
+            LOG.info("resetKeyRange " + WorkerSenderAddr + " TO " + newKeyEnd);
+            checkNewKeyEnd(newKeyEnd, WorkerSenderAddr);
 
-                // send unhashed string ,e.g 127.0.0.1:12000
-                String UnhashedOldKeyEnd = null;
-                // use workermap to find  UnhashedOldKeyEnd
-                // workermap stores startKey --> workerAddr mapping
-                Iterator iterator = workermap.keySet().iterator();
-                Integer keyStart = null;
-                while (iterator.hasNext()) {
-                    keyStart = (Integer) iterator.next();
-                    if (workerkeymap.get(WorkerSenderAddr).get(1).equals(keyStart.toString())) {
-                        UnhashedOldKeyEnd = workermap.get(keyStart);
-                        break;
-                    }
+            // send unhashed string ,e.g 127.0.0.1:12000
+            String UnhashedOldKeyEnd = null;
+            // use workermap to find  UnhashedOldKeyEnd
+            // workermap stores startKey --> workerAddr mapping
+            Iterator iterator = workermap.keySet().iterator();
+            Integer keyStart = null;
+            while (iterator.hasNext()) {
+                keyStart = (Integer) iterator.next();
+                if (workerkeymap.get(WorkerSenderAddr).get(1).equals(keyStart.toString())) {
+                    UnhashedOldKeyEnd = workermap.get(keyStart);
+                    break;
                 }
-                assert UnhashedOldKeyEnd != null;
-                workerService.ResetKeyEnd(UnhashedOldKeyEnd, WorkerReceiverADRR, WorkerReceiverADRR);
-                workerkeymap.get(WorkerSenderAddr).set(1, newKeyEnd);
-                workerState.put(WorkerSenderAddr, true);
+            }
+            assert UnhashedOldKeyEnd != null;
+
+            synchronized (workerState) {
+                workerState.put(WorkerSenderAddr, WORKERSTATE.READONLY);
+            }
+
+            workerService.ResetKeyEnd(UnhashedOldKeyEnd, WorkerReceiverADRR, WorkerReceiverADRR);
+            workerkeymap.get(WorkerSenderAddr).set(1, newKeyEnd);
+            synchronized (workerState) {
+                workerState.put(WorkerSenderAddr, WORKERSTATE.READWRITE);
             }
             return "OK";
         } catch (Exception e) {
@@ -266,7 +286,7 @@ public class Primary implements Watcher, PrimaryService {
         for (String w : workerlist) {
             //System.out.println(w);
             workermap.put(Hash(w), w);
-            workerState.put(w, true);// mark workers as active
+            workerState.put(w, WORKERSTATE.READWRITE);// mark workers as active
         }
         Iterator iterator = workermap.keySet().iterator();
         Integer keyStart = workermap.lastKey();
@@ -277,7 +297,13 @@ public class Primary implements Watcher, PrimaryService {
             ArrayList<String> list = new ArrayList<>();
             list.add(keyStart.toString());
             list.add(keyEnd.toString());
-            workerkeymap.put(workermap.get(keyEnd), list);
+            for (String w : workerlist) {
+                if (Hash(w).equals(keyStart)) {
+                    // make worker's KeyStart is the Hash(workerAddr)
+                    workerkeymap.put(w, list);
+                    break;
+                }
+            }
             keyStart = keyEnd;
         }
         // send all key range to Worker
@@ -395,6 +421,10 @@ public class Primary implements Watcher, PrimaryService {
         System.out.println(e);
     }
 
+    public enum WORKERSTATE {
+        READWRITE, READONLY, FAIL
+    }
+
     // last get workerlist
     class ProcessWorkerChange extends Thread {
         public void run() {
@@ -407,54 +437,46 @@ public class Primary implements Watcher, PrimaryService {
             }
             int newWorkerNum = 0;
             // check if worker fail
+            int oldWorkerNum = 0;
             for (String worker : workerlist) {
-                if (workerState.containsKey(worker)) {
-                    workerState.put(worker, false);// flip the state
-                } else {
-                    // ScaleOut needed
-                    newWorkerNum++;
+                synchronized (workerState) {
+                    if (workerState.containsKey(worker)) {
+                        oldWorkerNum++;
+                    } else {
+                        // ScaleOut needed
+                        newWorkerNum++;
+
+                    }
                 }
             }
-            for (Map.Entry<String, Boolean> entry : workerState.entrySet()) {
-                if (!entry.getValue()) {
-                    //flip back;
-                    workerState.put(entry.getKey(), true);
-                } else {
-                    LOG.warn("worker " + entry.getKey() + " failed");
-                }
+            if (workerState.size() - oldWorkerNum > 0) {
+                LOG.warn(workerState.size() - oldWorkerNum + "worker failed");
             }
             if (newWorkerNum >= 1) {
                 LOG.info(newWorkerNum + " new workers");
-                //有可能newWorkerNum大于1，暂时先只处理等于1的情况
+
                 ScaleOut scaleOut = new ScaleOut();
                 scaleOut.setName("scaleOut" + ScaleOutCounter.addAndGet(1));
                 scaleOut.start();
 
-                if (newWorkerNum > 1) {
-                    try {
-                        getWorkers();
-                    } catch (KeeperException e) {
-                        e.printStackTrace();
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
             }
         }
-
     }
 
-    class ScaleOut extends Thread {       /*
+
+    class ScaleOut extends Thread {
+        /*
                         如果在注册后立马有新的workersChangeWatcher回调
                         需要保证ScaleOut线程一个时间只运行一个
                         而且对workerConsumerConfigHashMap等map的操作也保证是线程安全的
                     */
         public void run() {
             LOG.info("ScaleOut triggered");
-            synchronized (workerConsumerConfigHashMap) {
-                // 设置workerConsumerConfigHashMap是线程安全的
+            synchronized (workerkeymap) {
+                // workerkeymap 只有在扩容成功时才会有workerReceiver
+                // 而且对workerkeymap加锁 不会阻塞 PUT GET DELETE
                 for (String workerReceiver : workerlist) {
-                    if (!workerConsumerConfigHashMap.containsKey(workerReceiver)) {
+                    if (!workerkeymap.containsKey(workerReceiver)) {
                         //workerConsumerConfigHashMap add workerReceiver in GetServiceByWorkerADDR()
                         WorkerService workerReiverService = GetServiceByWorkerADDR(workerReceiver);
                         // it's a new worker
@@ -469,26 +491,37 @@ public class Primary implements Watcher, PrimaryService {
                         String res = null;
                         try {
                             res = workerReiverService.SetKeyRange(workerReceiverKeyStart, workerReceiverKeyEnd, true);
-
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
-                        assert res.equals("OK");
-                        // notify the workerSender's to reset keyrange
-                        // workerSender do datatransfer
-                        // reset workerkeymap
-                        String newKeyEnd = Hash(workerReceiver).toString();
-                        res = resetKeyRange(newKeyEnd, workerSenderAddr, workerReceiver);
-                        LOG.info("resetKeyRange " + res);
-                        // if there are more new workers , have to wait til the former one is all set up,
-                        // 缺点是可能会a->b->c传两遍数据
+                        if (res.equals("OK")) {
+                            // notify the workerSender's to reset keyrange
+                            // workerSender do datatransfer
+                            // reset workerkeymap
 
-                        LOG.info("add " + workerReceiver + "  workerkeymap and workerState");
-                        ArrayList<String> a = new ArrayList<>();
-                        a.add(workerReceiverKeyStart);
-                        a.add(workerReceiverKeyEnd);
-                        workerkeymap.put(workerReceiver, a);
-                        workerState.put(workerReceiver, true);
+                            String newKeyEnd = Hash(workerReceiver).toString();
+                            res = resetKeyRange(newKeyEnd, workerSenderAddr, workerReceiver);
+                            LOG.info("resetKeyRange " + res);
+                            // if there are more new workers , have to wait til the former one is all set up,
+                            // 缺点是可能会a->b->c传两遍数据
+                            if (res.equals("OK")) {
+                                LOG.info("add " + workerReceiver + "  workerkeymap and workerState");
+                                ArrayList<String> a = new ArrayList<>();
+                                a.add(workerReceiverKeyStart);
+                                a.add(workerReceiverKeyEnd);
+
+                                workermap.put(Hash(workerReceiver), workerReceiver);
+                                workerkeymap.put(workerReceiver, a);
+                                synchronized (workerState) {
+                                    workerState.put(workerReceiver, WORKERSTATE.READWRITE);
+                                }
+                                LOG.info("ScaleOut " + workerReceiver + " Finished");
+                            } else {
+                                // resetKeyRange FAIL
+                            }
+                        } else {
+                            // workerReiverService.SetKeyRange FAIL
+                        }
                     }
                 }
             }

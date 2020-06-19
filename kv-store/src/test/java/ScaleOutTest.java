@@ -35,28 +35,28 @@ public class ScaleOutTest {
     }
 
     @Test
-    public void FullScaleOutOneWorkerTest() throws Exception, MWException {
+    public void ScaleOutOneWorkerTest() throws Exception, MWException {
         Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
         Thread.sleep(12000);
 
         // 存入大量data
-        StoreLargeData(0,100);
+        StoreLargeData(0, 100);
 
         //起1个普通worker
         Config.StartWorker(1);
 
         Thread.sleep(3000);
-        StoreLargeData(101,200);
+        StoreLargeData(101, 200);
         Thread.sleep(3000);
     }
 
     @Test
-    public void FullScaleOutTwoWorkerTest() throws Exception, MWException {
+    public void ScaleOutTwoWorkerTest() throws Exception, MWException {
         Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
         Thread.sleep(12000);
 
         // 存入大量data
-        StoreLargeData(0,100);
+        StoreLargeData(0, 100);
 
         //起2个普通worker
         Config.StartWorker(1);
@@ -64,10 +64,28 @@ public class ScaleOutTest {
         Config.StartWorker(2);
 
         Thread.sleep(3000);
-        StoreLargeData(101,200);
-        Thread.sleep(3000);
     }
 
+    @Test
+    public void ScaleOutFourWorkerTest() throws Exception, MWException {
+        Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
+        Thread.sleep(12000);
+
+        // 存入大量data
+        StoreLargeData(0, 100);
+
+        //起2个普通worker
+        Config.StartWorker(1);
+
+        Config.StartWorker(2);
+
+        Thread.sleep(3000);
+
+        Config.StartWorker(1);
+
+        Config.StartWorker(2);
+        Thread.sleep(3000);
+    }
 
     @Test
     public void LargeDataTransferTest() throws Exception, MWException {

@@ -87,12 +87,16 @@ public enum RingoDB implements DB {
         //save keyStart->KeyEnd
         int keystart = Hash(keyStart);
         int keyend = Hash(KeyEnd);
+        printDBContent();
         LOG.info("TrunkTreeMap" + keystart + " " + keyend);
         if (keystart < keyend) {
-            SortedMap<String, String> s = map.headMap(KeyEnd);
-            LOG.info("HEAD MAP" + s);
-            map.clear();
-            map = new TreeMap<String, String>(s);
+            TreeMap<String, String> newmap = new TreeMap<String, String>(new KeyComparator());
+            for (String key : map.keySet()) {
+                if (Hash(key) >= keystart && Hash(key) < keyend) {
+                    newmap.put(key, map.get(key));
+                }
+            }
+            map = newmap;
         }
         if (keystart > keyend) {
             TreeMap newmap = new TreeMap<String, String>(new KeyComparator());
