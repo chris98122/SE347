@@ -47,8 +47,6 @@ public enum RingoDB implements DB {
 
     public void setMap(TreeMap<String, String> data) throws RingoDBException {
         try {
-            // LOG.info(String.valueOf(data.comparator().getClass()));
-            // 目测是SOFARPC序列化完了Treemap comparator没了
             assert map.isEmpty();
             map = data;
             printDBContent();
@@ -64,9 +62,6 @@ public enum RingoDB implements DB {
         int keystart = Hash(keyStart);
         int keyend = Hash(KeyEnd);
         if (keystart < keyend) {
-            LOG.info("submap" + keystart + " " + keyend);
-            LOG.info(String.valueOf(map.comparator().compare(keyStart, KeyEnd)));
-
             return map.subMap(keyStart, KeyEnd).size() >= 1;
         }
         if (keystart > keyend) {
@@ -139,7 +134,6 @@ public enum RingoDB implements DB {
                 }
             }
         }
-        LOG.info(String.valueOf(res.comparator().getClass()));
         return res;
     }
 

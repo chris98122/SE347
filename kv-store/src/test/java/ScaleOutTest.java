@@ -92,10 +92,9 @@ public class ScaleOutTest {
         Config.StartWorker(1);
 
         //持续在ScaleOut 过程中PUT DATA
-        for(int i =0;i<10;i++)
-        {
+        for (int i = 0; i < 10; i++) {
             Thread.sleep(10);
-            StoreLargeData(i*100, 100);
+            StoreLargeData(i * 100, 100);
         }
 
         Thread.sleep(12000);

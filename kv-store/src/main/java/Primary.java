@@ -458,7 +458,7 @@ public class Primary implements Watcher, PrimaryService {
                     Boolean retrying = true;
                     while (retrying) {
                         try {
-                            WorkerAddr  = new String(zk.getData("/workers/" + worker, false, null)) ;
+                            WorkerAddr = new String(zk.getData("/workers/" + worker, false, null));
                             retrying = false;
 
                             synchronized (workerState) {
@@ -599,10 +599,10 @@ public class Primary implements Watcher, PrimaryService {
                                 }
                                 LOG.info("ScaleOut " + workerReceiver + " Finished");
                             } else {
-                                // resetKeyRange FAIL
+                                LOG.warn("resetKeyRange FAIL");
                             }
                         } else {
-                            // workerReiverService.SetKeyRange FAIL
+                            LOG.warn("workerReiverService.SetKeyRange FAIL");
                         }
                     }
                 }

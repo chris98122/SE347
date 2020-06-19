@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 
 public class Worker implements Watcher, WorkerService, DataTransferService {
     private static final Logger LOG = LoggerFactory.getLogger(Worker.class);
@@ -74,12 +75,11 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
         int snapshotcounter = 0;
         while (true) {
-            Thread.sleep(120000);// 两分钟运行一次
+            TimeUnit.HOURS.sleep(1);//一小时snapshot一次
             if (snapshotcounter < 10) {
                 RingoDB.INSTANCE.snapshot();//十次snapshot
                 snapshotcounter++;
             }
-            //java.io.NotSerializableException: DB.RingoDB$KeyComparator
         }
 
     }
@@ -145,7 +145,6 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             try {
                 TreeMap<String, String> data = RingoDB.INSTANCE.SplitTreeMap(NewKeyEnd, oldKeyEnd);
 
-                LOG.info(String.valueOf(data.comparator().getClass()));
                 LOG.info("do datatransfer: " + data);
                 String res = GetServiceByWorkerADDR(WorkerReceiverADRR).DoTransfer(data);
                 //delete db data
