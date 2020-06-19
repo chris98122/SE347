@@ -64,8 +64,13 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         w.registerToZookeeper();
         // if the worker is a new one, master should call rpc SetKeyRange(startKey,endKey,true)
 
+        int snapshotcounter = 0;
         while (true) {
-            Thread.sleep(600);
+            Thread.sleep(120000);// 两分钟运行一次
+            if(snapshotcounter<10) {
+                RingoDB.INSTANCE.snapshot();//十次snapshot
+                snapshotcounter++;
+            }
         }
 
     }

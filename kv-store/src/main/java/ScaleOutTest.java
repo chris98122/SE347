@@ -3,6 +3,7 @@ import org.junit.Test;
 
 public class ScaleOutTest {
     public static void main(String[] args) throws Exception, MWException {
+        ScaleOutWorkerTest();
     }
 
 
@@ -26,7 +27,7 @@ public class ScaleOutTest {
     }
 
     @Test
-    public void ScaleOutWorkerTest() throws Exception, MWException {
+    public static void ScaleOutWorkerTest() throws Exception, MWException {
         Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
         Thread.sleep(12000);
 
@@ -38,8 +39,16 @@ public class ScaleOutTest {
 
         //持续在ScaleOut 过程中GET DATA
         GETLargeData(0, 100);
-        Thread.sleep(12000);
-        //primary线程退出
+
+        int storedatatcounter = 1;
+
+        while(true) {
+            Thread.sleep(12000);
+            if(storedatatcounter<10) {
+                StoreLargeData(storedatatcounter * 100, 100);
+                storedatatcounter++;
+            }
+            }
 
     }
 }
