@@ -42,13 +42,13 @@ public class ScaleOutTest {
 
         int storedatatcounter = 1;
 
-        while(true) {
+        while (true) {
             Thread.sleep(12000);
-            if(storedatatcounter<10) {
+            if (storedatatcounter < 10) {
                 StoreLargeData(storedatatcounter * 100, 100);
                 storedatatcounter++;
             }
-            }
+        }
 
     }
 }
