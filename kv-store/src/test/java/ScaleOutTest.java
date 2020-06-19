@@ -30,7 +30,7 @@ public class ScaleOutTest {
         client.startZK();
         PrimaryService primaryService = client.PrimaryConnection();
         for (Integer i = start; i < start + datasize; i++) {
-            primaryService.PUT(i.toString(), i.toString());
+            System.out.println(primaryService.PUT(i.toString(), i.toString()));
         }
     }
 
@@ -77,6 +77,28 @@ public class ScaleOutTest {
         GETLargeData(0, 100);
         Thread.sleep(12000);
 
+    }
+
+
+    @Test
+    public void ScaleOutAndPUTTest() throws Exception, MWException {
+        Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
+        Thread.sleep(12000);
+
+        // 存入大量data
+        StoreLargeData(0, 100);
+
+        //起1个普通worker
+        Config.StartWorker(1);
+
+        //持续在ScaleOut 过程中PUT DATA
+        for(int i =0;i<10;i++)
+        {
+            Thread.sleep(10);
+            StoreLargeData(i*100, 100);
+        }
+
+        Thread.sleep(12000);
     }
 
     @Test

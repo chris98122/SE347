@@ -20,9 +20,13 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     ZooKeeper zk;
     String hostPort;
     String serverId;
+
+    String realAddress;
+    String realIP;
+    String realPort;
+
     String KeyStart = null;
     String KeyEnd = null;
-    int DataTransferoffset = 10;
     AsyncCallback.StringCallback createWorkerCallback = new AsyncCallback.StringCallback() {
         @Override
         public void processResult(int rc, String path, Object ctx, String name) {
@@ -42,7 +46,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
-                    registerToZookeeper();//try agagin
+                    registerToZookeeper();//try again
                     break;
                 default:
                     LOG.error("Something went wrong:" + KeeperException.create(KeeperException.Code.get(rc), path));
@@ -54,7 +58,11 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         this.WorkerPort = WorkerPort;
         this.hostPort = hostPort;
         serverId = WorkerIP + ':' + WorkerPort;
-        // WorkerID is used to distinguish different worker processes on one machine
+        // serverId is the workerAddr that is used for hashing
+        // which is the primary data node address
+        realAddress = serverId;
+        // realAddress is the address worker actually runs on
+
     }
 
     public static void main(String[] args) throws Exception {
@@ -71,6 +79,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 RingoDB.INSTANCE.snapshot();//十次snapshot
                 snapshotcounter++;
             }
+            //java.io.NotSerializableException: DB.RingoDB$KeyComparator
         }
 
     }
@@ -310,7 +319,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     }
 
     void registerToZookeeper() {
-        zk.create("/workers/" + serverId, "UnHashed".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, createWorkerCallback, null);
+        zk.create("/workers/" + serverId, realAddress.getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, createWorkerCallback, null);
     }
 
 }

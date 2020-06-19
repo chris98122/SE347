@@ -1,6 +1,8 @@
 import lib.PrimaryService;
 import org.junit.Test;
 
+import java.util.concurrent.TimeUnit;
+
 public class ScaleOutTest {
     public static void main(String[] args) throws Exception, MWException {
         ScaleOutWorkerTest();
@@ -47,6 +49,8 @@ public class ScaleOutTest {
             if (storedatatcounter < 10) {
                 StoreLargeData(storedatatcounter * 100, 100);
                 storedatatcounter++;
+            } else {
+                TimeUnit.HOURS.sleep(1);
             }
         }
 

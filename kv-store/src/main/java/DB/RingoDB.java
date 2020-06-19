@@ -50,7 +50,7 @@ public enum RingoDB implements DB {
             // LOG.info(String.valueOf(data.comparator().getClass()));
             // 目测是SOFARPC序列化完了Treemap comparator没了
             assert map.isEmpty();
-            map.putAll(data);
+            map = data;
             printDBContent();
         } catch (Exception e) {
             e.printStackTrace();
@@ -226,7 +226,7 @@ public enum RingoDB implements DB {
         }
     }
 
-    class KeyComparator implements Comparator<String>//比较器
+    class KeyComparator implements Comparator<String>, Serializable//比较器
     {
         @Override
         public int compare(String o1, String o2) {

@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.UnknownHostException;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
@@ -30,18 +31,27 @@ public class Primary implements Watcher, PrimaryService {
     TreeMap<Integer, String> workermap = new TreeMap<>();
     // helper structure for calculating workerkeymap
     // stores startKey --> workerAddr mapping
+    // startKey is Hash(workerAddr)
     // e.g -399182218 -->  212.64.64.185:12201
     // NOT USED SINCE INITIAL HASH WORKERS, MAY CHANGE TO LOCAL VARIABLE
 
     TreeMap<String, ArrayList<String>> workerkeymap = new TreeMap<>();
     // stores workerAddr --> [KeyStart, KeyEnd] mapping
     // e.g 212.64.64.185:12201  --> [-399182218,1302869320]
+    // KeyStart is Hash(workerAddr)
 
     HashMap<String, ConsumerConfig<WorkerService>> workerConsumerConfigHashMap = new HashMap<String, ConsumerConfig<WorkerService>>();
     // stores workerAddr -->ConsumerConfig mapping
-    HashMap<String, WORKERSTATE> workerState = new HashMap<>();
-    List<String> workerlist = null;
+    // the ConsumerConfig may change to standby node dur to worker failure
+
+    volatile HashMap<String, WORKERSTATE> workerState = new HashMap<>();
+
+    volatile List<String> workerlist = null;
     // 保存最新一次获取的workers
+
+    CountDownLatch ScaleOutLatch = new CountDownLatch(0);
+
+    CountDownLatch ProcessWorkerChangeLatch = new CountDownLatch(0);
 
     AsyncCallback.StringCallback createParentCallback = new AsyncCallback.StringCallback() {
         @Override
@@ -59,29 +69,6 @@ public class Primary implements Watcher, PrimaryService {
                     break;
                 default:
                     LOG.error("something went wrong" + KeeperException.create(KeeperException.Code.get(rc), path));
-            }
-        }
-    };
-    //主节点等待从节点的变化（包括worker node fail 或者 增加）
-    //ZooKeeper客户端也可以通过getData，getChildren和exist三个接口来向ZooKeeper服务器注册Watcher
-    Watcher workersChangeWatcher = new Watcher() {
-        public void process(WatchedEvent e) {
-            if (e.getType() == Event.EventType.NodeChildrenChanged) {
-                assert ("/workers".equals(e.getPath()));
-                LOG.info("workersChangeWatcher triggered");
-                try {
-                    /*如果在重新注册watcher的时间里发生了"/worker"的变化
-                    1. worker fail ：之后讨论
-                    2. new worker add :解决方法是new worker 60秒内都没有收到setKeyRange()就打个LOG然后等运维手动重启
-                    */
-                    getWorkers();//watcher是一次性的所以必须再次注册
-                    //客户端 Watcher 回调的过程是一个串行同步的过程，所以另开线程处理
-                    ProcessWorkerChange processWorkerChange = new ProcessWorkerChange();
-                    processWorkerChange.setName("processWorkerChange" + ProcessWorkerChangeCounter.addAndGet(1));
-                    processWorkerChange.start();
-                } catch (KeeperException | InterruptedException keeperException) {
-                    keeperException.printStackTrace();
-                }
             }
         }
     };
@@ -103,6 +90,33 @@ public class Primary implements Watcher, PrimaryService {
                     break;
                 default:
                     LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
+            }
+        }
+    };
+    //主节点等待从节点的变化（包括worker node fail 或者 增加）
+    //ZooKeeper客户端也可以通过getData，getChildren和exist三个接口来向ZooKeeper服务器注册Watcher
+    Watcher workersChangeWatcher = new Watcher() {
+        public void process(WatchedEvent e) {
+            if (e.getType() == Event.EventType.NodeChildrenChanged) {
+                assert ("/workers".equals(e.getPath()));
+                LOG.info("workersChangeWatcher triggered");
+                try {
+                    /*如果在重新注册watcher的时间里发生了"/worker"的变化
+                    1. worker fail ：之后讨论
+                    2. new worker add :解决方法是new worker 60秒内都没有收到setKeyRange()就打个LOG然后等运维手动重启
+                    */
+                    getWorkers();//watcher是一次性的所以必须再次注册
+                    //客户端 Watcher 回调的过程是一个串行同步的过程，所以另开线程处理
+
+                    // 一个时间只能有一个ProcessWorkerChange 线程
+                    ProcessWorkerChangeLatch.await();
+
+                    ProcessWorkerChange processWorkerChange = new ProcessWorkerChange();
+                    processWorkerChange.setName("processWorkerChange" + ProcessWorkerChangeCounter.addAndGet(1));
+                    processWorkerChange.start();
+                } catch (KeeperException | InterruptedException keeperException) {
+                    keeperException.printStackTrace();
+                }
             }
         }
     };
@@ -146,13 +160,12 @@ public class Primary implements Watcher, PrimaryService {
         try {
             WorkerService workerService = GetServiceByWorkerADDR(WorkerAddr);
             LOG.info("ASSIGN PUT " + key + ":" + value + " TO " + WorkerAddr);
-            synchronized (workerState) {
-                while (!workerState.get(WorkerAddr).equals(WORKERSTATE.READWRITE)) {
-                    //spin
-                    LOG.info(WorkerAddr + "can not put");
-                }
+            if (!workerState.get(WorkerAddr).equals(WORKERSTATE.READWRITE)) {
+                //spin
+                LOG.info(WorkerAddr + "can not put");
+                return "the service is not available right now.";
+            } else
                 return workerService.PUT(key, value);
-            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -165,12 +178,11 @@ public class Primary implements Watcher, PrimaryService {
         try {
             WorkerService workerService = GetServiceByWorkerADDR(WorkerAddr);
             LOG.info("ASSIGN GET " + key + " TO " + WorkerAddr);
-            synchronized (workerState) {
-                while (workerState.get(WorkerAddr).equals(WORKERSTATE.FAIL)) {
-                    LOG.info(WorkerAddr + "can not GET");
-                }
+            if (workerState.get(WorkerAddr).equals(WORKERSTATE.FAIL)) {
+                LOG.info(WorkerAddr + "can not GET");
+                return "the service is not available right now.";
+            } else
                 return workerService.GET(key);
-            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -183,13 +195,12 @@ public class Primary implements Watcher, PrimaryService {
         try {
             WorkerService workerService = GetServiceByWorkerADDR(WorkerAddr);
             LOG.info("ASSIGN delete " + key + " TO " + WorkerAddr);
-            synchronized (workerState) {
-                while (!workerState.get(WorkerAddr).equals(WORKERSTATE.READWRITE)) {
-                    //spin
-                    LOG.info(WorkerAddr + "can not delete");
-                }
+            if (!workerState.get(WorkerAddr).equals(WORKERSTATE.READWRITE)) {
+                //spin
+                LOG.info(WorkerAddr + "can not delete");
+                return "the service is not available right now.";
+            } else
                 return workerService.DELETE(key);
-            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -425,10 +436,11 @@ public class Primary implements Watcher, PrimaryService {
         READWRITE, READONLY, FAIL
     }
 
-    // last get workerlist
+
     class ProcessWorkerChange extends Thread {
         public void run() {
-
+            // 一个时间只能有一个ProcessWorkerChange 线程
+            ProcessWorkerChangeLatch = new CountDownLatch(1);
             try {
                 workerlist = zk.getChildren("/workers", null);//sync call
                 LOG.info(String.valueOf(workerlist));
@@ -436,17 +448,70 @@ public class Primary implements Watcher, PrimaryService {
                 keeperException.printStackTrace();
             }
             int newWorkerNum = 0;
-            // check if worker fail
-            int oldWorkerNum = 0;
-            for (String worker : workerlist) {
-                synchronized (workerState) {
-                    if (workerState.containsKey(worker)) {
-                        oldWorkerNum++;
-                    } else {
-                        // ScaleOut needed
-                        newWorkerNum++;
 
+            int oldWorkerNum = 0;
+
+            for (String worker : workerlist) {
+                if (workerState.containsKey(worker)) {
+                    oldWorkerNum++;
+                    String WorkerAddr = null;
+                    Boolean retrying = true;
+                    while (retrying) {
+                        try {
+                            WorkerAddr  = new String(zk.getData("/workers/" + worker, false, null)) ;
+                            retrying = false;
+
+                            synchronized (workerState) {
+                                if (!workerState.get(worker).equals(WORKERSTATE.READONLY)) {
+                                    workerState.put(worker, WORKERSTATE.READWRITE);
+                                }
+                            }
+                        } catch (KeeperException.NoNodeException e) {
+                            synchronized (workerState) {
+                                workerState.put(worker, WORKERSTATE.FAIL);
+                            }
+                            LOG.info(worker + "znode 不存在,retry");
+                        } catch (KeeperException | InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        try {
+                            Thread.sleep(10);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
                     }
+
+                    String oldaddr = workerConsumerConfigHashMap.get(worker).getDirectUrl().substring(7);
+                    LOG.info(oldaddr);
+                    LOG.info(WorkerAddr);
+                    if (!WorkerAddr.equals(oldaddr)) {
+                        synchronized (workerState) {
+                            workerState.put(worker, WORKERSTATE.FAIL);
+                        }
+                        // change workerConsumerConfigHashMap to standby  node
+                        // so that GetServiceByWorkerADDR get the standby node address
+                        ConsumerConfig<WorkerService> consumerConfig;
+                        String workerip = WorkerAddr.split(":")[0];
+                        String workerport = WorkerAddr.split(":")[1];
+                        consumerConfig = new ConsumerConfig<WorkerService>()
+                                .setInterfaceId(WorkerService.class.getName()) // 指定接口
+                                .setProtocol("bolt") // 指定协议
+                                .setDirectUrl("bolt://" + workerip + ":" + workerport) // 指定直连地址
+                                .setTimeout(2000)
+                                .setRepeatedReferLimit(30); //允许同一interface，同一uniqueId，不同server情况refer 30次，用于单机调试
+
+                        synchronized (workerConsumerConfigHashMap) {
+                            workerConsumerConfigHashMap.put(worker, consumerConfig);
+                        }
+                        LOG.info("set ConsumerConfig  " + worker + "->" + WorkerAddr);
+                        //set  workerState
+                        synchronized (workerState) {
+                            workerState.put(worker, WORKERSTATE.READWRITE);
+                        }
+                    }
+                } else {
+                    // ScaleOut needed
+                    newWorkerNum++;
                 }
             }
             if (workerState.size() - oldWorkerNum > 0) {
@@ -455,11 +520,17 @@ public class Primary implements Watcher, PrimaryService {
             if (newWorkerNum >= 1) {
                 LOG.info(newWorkerNum + " new workers");
 
+                //一个时间只能有一个ScaleOut 线程
+                try {
+                    ScaleOutLatch.await();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
                 ScaleOut scaleOut = new ScaleOut();
                 scaleOut.setName("scaleOut" + ScaleOutCounter.addAndGet(1));
                 scaleOut.start();
-
             }
+            ProcessWorkerChangeLatch.countDown();
         }
     }
 
@@ -471,10 +542,21 @@ public class Primary implements Watcher, PrimaryService {
                         而且对workerConsumerConfigHashMap等map的操作也保证是线程安全的
                     */
         public void run() {
+
+            ScaleOutLatch = new CountDownLatch(1);
             LOG.info("ScaleOut triggered");
             synchronized (workerkeymap) {
                 // workerkeymap 只有在扩容成功时才会有workerReceiver
                 // 而且对workerkeymap加锁 不会阻塞 PUT GET DELETE
+
+                try {
+                    workerlist = zk.getChildren("/workers", null);
+                    // 保证获得是最新的workerlist
+                } catch (KeeperException e) {
+                    e.printStackTrace();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
                 for (String workerReceiver : workerlist) {
                     if (!workerkeymap.containsKey(workerReceiver)) {
                         //workerConsumerConfigHashMap add workerReceiver in GetServiceByWorkerADDR()
@@ -525,6 +607,8 @@ public class Primary implements Watcher, PrimaryService {
                     }
                 }
             }
+
+            ScaleOutLatch.countDown();
         }
     }
 
