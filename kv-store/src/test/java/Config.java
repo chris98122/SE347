@@ -31,7 +31,7 @@ public class Config {
                         Worker w = new Worker(workerargs[0], workerargs[1], workerargs[2], workerargs[3], workerargs[4]);
                         w.startZK();
                         w.registerRPCServices();// make sure the RPC can work, then register to zookeeper
-                        w.registerToZookeeper();// if the worker is a new one, master should call rpc SetKeyRange
+                        w.runForPrimaryDataNode();// if the worker is a new one, master should call rpc SetKeyRange
                         Thread.sleep(2000);
                         //主动断开
                         w.zk.close();

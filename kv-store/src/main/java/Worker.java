@@ -7,6 +7,7 @@ import lib.DataTransferService;
 import lib.WorkerService;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.zookeeper.*;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,6 +15,8 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+
+import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
 
 public class Worker implements Watcher, WorkerService, DataTransferService {
     private static final Logger LOG = LoggerFactory.getLogger(Worker.class);
@@ -29,35 +32,44 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     private final String zookeeperaddress;
     ZooKeeper zk;
     String KeyEnd = null;
-    AsyncCallback.StringCallback createWorkerCallback = new AsyncCallback.StringCallback() {
+    private boolean isPrimary;
+    Watcher workerExistsWatcher = new Watcher() {
+        public void process(WatchedEvent e) {
+            if (e.getType() == Event.EventType.NodeDeleted) {
+                assert ("/workers/" + primaryNodeAddr).equals(e.getPath());
+                //如果是自己所属的worker断开连接,则尝试自己成为PrimaryDtaNode
+                runForPrimaryDataNode();
+            }
+        }
+    };
+    AsyncCallback.StatCallback workerExistsCallback = new AsyncCallback.StatCallback() {
         @Override
-        public void processResult(int rc, String path, Object ctx, String name) {
+        public void processResult(int rc, String path, Object ctx, Stat stat) {
             switch (KeeperException.Code.get(rc)) {
                 case CONNECTIONLOSS:
-                    LOG.info("retry register to zookeeper " + realAddress);
-                    registerToZookeeper();//try agagin
+                    // 连接丢失的情况下重试
+                    LOG.info("CONNECTIONLOSS , retry PrimaryDataNodeExists()");
+                    PrimaryDataNodeExists();
                     break;
                 case OK:
-                    LOG.info("Registered successfully:" + realAddress);
-                    break;
-                case NODEEXISTS:
-                    // RETRY JUST FOR EASY DEPLOYMENT, SHOULD MODIFY LATER
-                    LOG.warn("Already registered:" + realAddress);
-                    try {
-                        Thread.sleep(600);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
+                    // 如果返回OK，判断znode节点是否存在，不存在就竞选runForPrimaryDataNode
+                    if (stat == null) {
+                        LOG.info("worker node not exists, runForPrimaryDataNode()");
+                        runForPrimaryDataNode();
                     }
-                    registerToZookeeper();//try again
                     break;
                 default:
-                    LOG.error("Something went wrong:" + KeeperException.create(KeeperException.Code.get(rc), path));
+                    // 如果发生意外情况，通过获取节点数据来检查/workers/+primaryNodeAddr 节点是否存在
+                    LOG.info("sth is wrong, checkPrimaryDataNode()");
+                    checkPrimaryDataNode();
+                    break;
             }
         }
     };
     volatile private String KeyStart = null;
 
     Worker(String zookeeperaddress, String primaryNodeIP, String primaryNodePort, String realIP, String realPort) throws UnknownHostException {
+
         this.primaryNodeIP = primaryNodeIP;
         this.primaryNodePort = primaryNodePort;
         this.zookeeperaddress = zookeeperaddress;
@@ -68,14 +80,14 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         this.realPort = realPort;
         this.realAddress = realIP + ":" + realPort;
         // realAddress is the address worker actually runs on
-
+        LOG.info("WORKER METADATA:" + " [primaryNodeAddr] " + primaryNodeAddr + " [realAddress] " + realAddress);
     }
 
     public static void main(String[] args) throws Exception {
         Worker w = new Worker(args[0], args[1], args[2], args[3], args[4]);
         w.startZK();
         w.registerRPCServices();// make sure the RPC can work, then register to zookeeper
-        w.registerToZookeeper();
+        w.runForPrimaryDataNode();
         // if the worker is a new one, master should call rpc SetKeyRange(startKey,endKey,true)
 
         // 等60秒，如果没有收到setKeyRange()就重新连接zookeeper
@@ -84,7 +96,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         while (w.KeyStart == null) {
             LOG.warn("the scale out is not started,retry");
             w.zk.close();
-            w.registerToZookeeper();
+            w.runForPrimaryDataNode();
             TimeUnit.MINUTES.sleep(1);
         }
 
@@ -104,6 +116,23 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         String encodeStr = DigestUtils.md5Hex(string);
         //System.out.println("MD5加密后的字符串为:encodeStr="+encodeStr);
         return encodeStr.hashCode();
+    }
+
+    boolean checkPrimaryDataNode() {
+        while (true) {
+            try {
+                Stat stat = new Stat();
+                byte[] data = zk.getData("/workers/" + primaryNodeAddr, false, stat);
+                isPrimary = new String(data).equals(realAddress);
+                LOG.info(realAddress + "is the primary Data Node");
+                return true;
+            } catch (KeeperException.NoNodeException e) {
+                return false;
+            } catch (KeeperException.ConnectionLossException ignored) {
+            } catch (InterruptedException | KeeperException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     boolean checkNeedDataTransfer(String start, String end) {
@@ -333,8 +362,28 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         LOG.info(e.toString() + "," + zookeeperaddress);
     }
 
-    void registerToZookeeper() {
-        zk.create("/workers/" + primaryNodeAddr, realAddress.getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, createWorkerCallback, null);
+    void PrimaryDataNodeExists() {
+        zk.exists("/workers" + primaryNodeAddr, workerExistsWatcher, workerExistsCallback, null);
+    }
+
+    void runForPrimaryDataNode() {
+        while (true) {
+            try {
+                LOG.info(realAddress + " is running for PrimaryDataNode");
+                zk.create("/workers/" + primaryNodeAddr, realAddress.getBytes(), OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+                // create master znode should use CreateMode.EPHEMERAL
+                // so the znode would be deleted when the connection is lost
+                isPrimary = true;
+                break;
+            } catch (KeeperException.NoNodeException e) {
+                isPrimary = false;
+                break;
+            } catch (KeeperException.ConnectionLossException ignored) {
+            } catch (KeeperException | InterruptedException e) {
+                e.printStackTrace();
+            }
+            if (checkPrimaryDataNode()) break;
+        }
     }
 
 }
