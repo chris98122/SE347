@@ -104,7 +104,7 @@ public class ScaleOutTest {
 
         consumerConfig.refer().PUT("ringo", "apple");
         consumerConfig.refer().DELETE("ringo");
-        DataTransferService S = w.GetServiceByWorkerADDR(PrivateData.ip + ":12301");
+        DataTransferService S = w.GetDataTransferServiceByWorkerADDR(PrivateData.ip + ":12301");
         TreeMap<String, String> m = new TreeMap<>();
 
         for (Integer i = 0; i < 100; i++) {
@@ -146,7 +146,7 @@ public class ScaleOutTest {
                                 .setRepeatedReferLimit(30); //允许同一interface，同一uniqueId，不同server情况refer 30次，用于单机调试
                         consumerConfig.refer().PUT("ringo", "apple");
                         consumerConfig.refer().DELETE("ringo");
-                        DataTransferService S = w.GetServiceByWorkerADDR(PrivateData.ip + ":12301");
+                        DataTransferService S = w.GetDataTransferServiceByWorkerADDR(PrivateData.ip + ":12301");
                         TreeMap<String, String> m = new TreeMap<>();
                         m.put("ringo", "apple");
                         S.DoTransfer(m);
