@@ -25,23 +25,6 @@ public class ScaleOutTest {
         assertEquals("OK", primaryService.PUT("pineapple", "pineapple"));
     }
 
-    static void StoreLargeData(Integer start, Integer datasize) throws Exception {
-        Client client = new Client(Config.zookeeperHost);
-        client.startZK();
-        PrimaryService primaryService = client.PrimaryConnection();
-        for (Integer i = start; i < start + datasize; i++) {
-            System.out.println(primaryService.PUT(i.toString(), i.toString()));
-        }
-    }
-
-    static void GETLargeData(Integer start, Integer datasize) throws Exception {
-        Client client = new Client(Config.zookeeperHost);
-        client.startZK();
-        PrimaryService primaryService = client.PrimaryConnection();
-        for (Integer i = start; i < start + datasize; i++) {
-            primaryService.GET(i.toString());
-        }
-    }
 
     @Test
     public void ScaleOutOneWorkerTest() throws Exception, MWException {
@@ -49,13 +32,13 @@ public class ScaleOutTest {
         Thread.sleep(12000);
 
         // 存入大量data
-        StoreLargeData(0, 100);
+        Config.StoreLargeData(0, 100);
 
         //起1个普通worker
         Config.StartWorker(1);
 
         Thread.sleep(3000);
-        StoreLargeData(101, 200);
+        Config.StoreLargeData(101, 200);
         while (true)
             Thread.sleep(3000);
     }
@@ -66,7 +49,7 @@ public class ScaleOutTest {
         Thread.sleep(12000);
 
         // 存入大量data
-        StoreLargeData(0, 100);
+        Config.StoreLargeData(0, 100);
 
         //起1个普通worker
         Config.StartWorker(1);
@@ -75,7 +58,7 @@ public class ScaleOutTest {
         //手动起两个worker进程
 
         //持续在ScaleOut 过程中GET DATA
-        GETLargeData(0, 100);
+        Config.GETLargeData(0, 100);
         Thread.sleep(12000);
 
     }
@@ -87,7 +70,7 @@ public class ScaleOutTest {
         Thread.sleep(12000);
 
         // 存入大量data
-        StoreLargeData(0, 100);
+        Config.StoreLargeData(0, 100);
 
         //起1个普通worker
         Config.StartWorker(1);
@@ -95,7 +78,7 @@ public class ScaleOutTest {
         //持续在ScaleOut 过程中PUT DATA
         for (int i = 0; i < 10; i++) {
             Thread.sleep(10);
-            StoreLargeData(i * 100, 100);
+            Config.StoreLargeData(i * 100, 100);
         }
 
         Thread.sleep(12000);

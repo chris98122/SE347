@@ -1,3 +1,5 @@
+import lib.PrimaryService;
+
 public class Config {
     public static final String zookeeperHost = "112.124.23.139:2181,112.124.23.139:2182,112.124.23.139:2183";
 
@@ -82,4 +84,23 @@ public class Config {
         t.setDaemon(true);
         t.start();
     }
+
+    public static void StoreLargeData(Integer start, Integer datasize) throws Exception {
+        Client client = new Client(Config.zookeeperHost);
+        client.startZK();
+        PrimaryService primaryService = client.PrimaryConnection();
+        for (Integer i = start; i < start + datasize; i++) {
+            System.out.println(primaryService.PUT(i.toString(), i.toString()));
+        }
+    }
+
+    public static void GETLargeData(Integer start, Integer datasize) throws Exception {
+        Client client = new Client(Config.zookeeperHost);
+        client.startZK();
+        PrimaryService primaryService = client.PrimaryConnection();
+        for (Integer i = start; i < start + datasize; i++) {
+            primaryService.GET(i.toString());
+        }
+    }
+
 }

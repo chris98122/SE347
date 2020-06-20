@@ -48,7 +48,8 @@ public enum RingoDB implements DB {
     public void setMap(TreeMap<String, String> data) throws RingoDBException {
         try {
             assert map.isEmpty();
-            map = data;
+            //   SOFARPC序列化还是有问题
+            map.putAll(data);
             printDBContent();
         } catch (Exception e) {
             e.printStackTrace();
@@ -62,6 +63,7 @@ public enum RingoDB implements DB {
         int keystart = Hash(keyStart);
         int keyend = Hash(KeyEnd);
         if (keystart < keyend) {
+
             return map.subMap(keyStart, KeyEnd).size() >= 1;
         }
         if (keystart > keyend) {
@@ -220,7 +222,7 @@ public enum RingoDB implements DB {
         }
     }
 
-    class KeyComparator implements Comparator<String>, Serializable//比较器
+    private class KeyComparator implements Comparator<String>, Serializable//比较器
     {
         @Override
         public int compare(String o1, String o2) {
