@@ -17,31 +17,32 @@ import java.util.concurrent.TimeUnit;
 
 public class Worker implements Watcher, WorkerService, DataTransferService {
     private static final Logger LOG = LoggerFactory.getLogger(Worker.class);
-    private final String WorkerPort;
+    // primary data node metadata
+    private final String primaryNodeIP;
+    private final String primaryNodePort;
+    private final String primaryNodeAddr;
+    // real node metadata
+    private final String realAddress;
+    private final String realIP;
+    private final String realPort;
+
+    private final String zookeeperaddress;
     ZooKeeper zk;
-    String hostPort;
-    String serverId;
-
-    String realAddress;
-    String realIP;
-    String realPort;
-
-    String KeyStart = null;
     String KeyEnd = null;
     AsyncCallback.StringCallback createWorkerCallback = new AsyncCallback.StringCallback() {
         @Override
         public void processResult(int rc, String path, Object ctx, String name) {
             switch (KeeperException.Code.get(rc)) {
                 case CONNECTIONLOSS:
-                    LOG.info("retry register to zookeeper " + serverId);
+                    LOG.info("retry register to zookeeper " + realAddress);
                     registerToZookeeper();//try agagin
                     break;
                 case OK:
-                    LOG.info("Registered successfully:" + serverId);
+                    LOG.info("Registered successfully:" + realAddress);
                     break;
                 case NODEEXISTS:
                     // RETRY JUST FOR EASY DEPLOYMENT, SHOULD MODIFY LATER
-                    LOG.warn("Already registered:" + serverId);
+                    LOG.warn("Already registered:" + realAddress);
                     try {
                         Thread.sleep(600);
                     } catch (InterruptedException e) {
@@ -54,20 +55,24 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             }
         }
     };
+    volatile private String KeyStart = null;
 
-    Worker(String hostPort, String WorkerIP, String WorkerPort) throws UnknownHostException {
-        this.WorkerPort = WorkerPort;
-        this.hostPort = hostPort;
-        serverId = WorkerIP + ':' + WorkerPort;
+    Worker(String zookeeperaddress, String primaryNodeIP, String primaryNodePort, String realIP, String realPort) throws UnknownHostException {
+        this.primaryNodeIP = primaryNodeIP;
+        this.primaryNodePort = primaryNodePort;
+        this.zookeeperaddress = zookeeperaddress;
+        primaryNodeAddr = primaryNodeIP + ':' + primaryNodePort;
         // serverId is the workerAddr that is used for hashing
         // which is the primary data node address
-        realAddress = serverId;
+        this.realIP = realIP;
+        this.realPort = realPort;
+        this.realAddress = realIP + ":" + realPort;
         // realAddress is the address worker actually runs on
 
     }
 
     public static void main(String[] args) throws Exception {
-        Worker w = new Worker(args[0], args[1], args[2]);
+        Worker w = new Worker(args[0], args[1], args[2], args[3], args[4]);
         w.startZK();
         w.registerRPCServices();// make sure the RPC can work, then register to zookeeper
         w.registerToZookeeper();
@@ -76,8 +81,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         // 等60秒，如果没有收到setKeyRange()就重新连接zookeeper
         // 这个情况适用于 InitialhashWorkers和ScaleOut 两者中的setKeyRange()
         TimeUnit.MINUTES.sleep(1);
-        while(w.KeyStart == null)
-        {
+        while (w.KeyStart == null) {
             LOG.warn("the scale out is not started,retry");
             w.zk.close();
             w.registerToZookeeper();
@@ -160,7 +164,8 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 String res = GetServiceByWorkerADDR(WorkerReceiverADRR).DoTransfer(data);
                 //delete db data
                 if (res.equals("OK"))
-                    RingoDB.INSTANCE.TrunkTreeMap(this.serverId, NewKeyEnd);
+                    RingoDB.INSTANCE.TrunkTreeMap(this.primaryNodeAddr, NewKeyEnd);
+                // use primaryNodeAddr, because Hash(primaryNodeAddr) == KeyStart
                 return res;
             } catch (Exception e) {
                 e.printStackTrace();
@@ -194,10 +199,10 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             //set KeyRange
             this.KeyStart = keystart;
             this.KeyEnd = keyend;
-            LOG.info(serverId + ":" + keystart + " " + keyend);
+            LOG.info(realAddress + ":" + keystart + " " + keyend);
             // register as RPC Server
             registerDataTransferService();
-            LOG.info(serverId + " resgistered data transfer Service");
+            LOG.info(realAddress + " resgistered data transfer Service");
             // (RPC port for data transfer is the same as WorkerPort)
             return "OK";
         }
@@ -275,11 +280,10 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     void registerDataTransferService() {
         try {
 
-            int port = Integer.parseInt(WorkerPort);
-            LOG.info("registerDataTransferService PORT" + port);
+            LOG.info("registerDataTransferService PORT" + realAddress);
             ServerConfig serverConfig = (ServerConfig) new ServerConfig()
                     .setProtocol("bolt") // 设置一个协议，默认bolt
-                    .setPort(port) // 设置一个端口，即args[2]
+                    .setPort(Integer.parseInt(realPort))// 设置一个端口，即realPort
                     .setDaemon(true);// 守护线程
 
             ProviderConfig<DataTransferService> providerConfig = new ProviderConfig<DataTransferService>()
@@ -297,9 +301,10 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
     void registerRPCServices() {
         try {
+            LOG.info("registerRPCServices PORT" + realAddress);
             ServerConfig serverConfig = new ServerConfig()
                     .setProtocol("bolt") // 设置一个协议，默认bolt
-                    .setPort(Integer.parseInt(WorkerPort)) // 设置一个端口，即args[2]
+                    .setPort(Integer.parseInt(realPort)) // 设置一个端口，即realPort
                     .setDaemon(true); // 守护线程
 
             ProviderConfig<WorkerService> providerConfig = new ProviderConfig<WorkerService>()
@@ -317,7 +322,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
     void startZK() {
         try {
-            zk = new ZooKeeper(hostPort, 15000, this);
+            zk = new ZooKeeper(zookeeperaddress, 15000, this);
 
         } catch (java.io.IOException e) {
             e.printStackTrace();
@@ -325,11 +330,11 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     }
 
     public void process(WatchedEvent e) {
-        LOG.info(e.toString() + "," + hostPort);
+        LOG.info(e.toString() + "," + zookeeperaddress);
     }
 
     void registerToZookeeper() {
-        zk.create("/workers/" + serverId, realAddress.getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, createWorkerCallback, null);
+        zk.create("/workers/" + primaryNodeAddr, realAddress.getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, createWorkerCallback, null);
     }
 
 }

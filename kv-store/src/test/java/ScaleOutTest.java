@@ -105,8 +105,10 @@ public class ScaleOutTest {
         Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
         Thread.sleep(12000);
 
-        String workerargs[] = {Config.zookeeperHost, PrivateData.ip, "12302"};
-        Worker w = new Worker(workerargs[0], workerargs[1], workerargs[2]);
+        String workerargs[] = {Config.zookeeperHost, PrivateData.ip, "12302",
+                PrivateData.ip, "12302"
+        };
+        Worker w = new Worker(workerargs[0], workerargs[1], workerargs[2], workerargs[3], workerargs[4]);
         w.registerRPCServices();
 
         ConsumerConfig<WorkerService> consumerConfig = new ConsumerConfig<WorkerService>()
@@ -146,8 +148,11 @@ public class ScaleOutTest {
                 () ->
                 {
                     try {
-                        String workerargs[] = {Config.zookeeperHost, PrivateData.ip, "12302"};
-                        Worker w = new Worker(workerargs[0], workerargs[1], workerargs[2]);
+                        String workerargs[] = {Config.zookeeperHost, PrivateData.ip, "12302",
+                                PrivateData.ip, "12302"
+                        };
+                        Worker w = new Worker(workerargs[0], workerargs[1], workerargs[2], workerargs[3], workerargs[4]);
+
                         w.registerRPCServices();
                         ConsumerConfig<WorkerService> consumerConfig = new ConsumerConfig<WorkerService>()
                                 .setInterfaceId(WorkerService.class.getName()) // 指定接口

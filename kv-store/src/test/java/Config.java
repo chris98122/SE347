@@ -24,8 +24,11 @@ public class Config {
                 () ->
                 {
                     try {
-                        String workerargs[] = {Config.zookeeperHost, PrivateData.ip, "1230" + workerID.toString()};
-                        Worker w = new Worker(workerargs[0], workerargs[1], workerargs[2]);
+                        //primary data node
+                        String workerargs[] = {Config.zookeeperHost, PrivateData.ip, "1230" + workerID.toString(),
+                                PrivateData.ip, "1230" + workerID.toString()
+                        };
+                        Worker w = new Worker(workerargs[0], workerargs[1], workerargs[2], workerargs[3], workerargs[4]);
                         w.startZK();
                         w.registerRPCServices();// make sure the RPC can work, then register to zookeeper
                         w.registerToZookeeper();// if the worker is a new one, master should call rpc SetKeyRange
@@ -47,7 +50,9 @@ public class Config {
                 () ->
                 {
                     try {
-                        String workerargs[] = {Config.zookeeperHost, PrivateData.ip, "1230" + workerID.toString()};
+                        String workerargs[] = {Config.zookeeperHost, PrivateData.ip, "1230" + workerID.toString(),
+                                PrivateData.ip, "1230" + workerID.toString()
+                        };
                         Worker.main(workerargs);
                     } catch (Exception e) {
                         e.printStackTrace();

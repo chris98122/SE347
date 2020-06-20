@@ -132,8 +132,8 @@ public class Primary implements Watcher, PrimaryService {
         m.startZK();
         m.runForPrimary();
         if (isLeader) {
-            System.out.println("I'm the leader.");
-            System.out.println("serverId:" + serverId);
+            LOG.info("I'm the leader.");
+            LOG.info("serverId:" + serverId);
             m.boostrap();
             m.InitialhashWorkers();// block until initialize at 2 workers
             m.getWorkers();//register the "/worker"" Watcher
@@ -141,15 +141,13 @@ public class Primary implements Watcher, PrimaryService {
             m.registerRPCServices(); //after setting the Master-Worker , the Master can receive rpc from clients
             m.run();
         } else {
-            System.out.println("Some one else is the leader.");
+            LOG.info("Some one else is the leader.");
         }
         //  m.stopZK();
     }
 
     public static Integer Hash(String string) {
-        //加密后的字符串
         String encodeStr = DigestUtils.md5Hex(string);
-        //System.out.println("MD5加密后的字符串为:encodeStr="+encodeStr);
         return encodeStr.hashCode();
     }
 
@@ -264,7 +262,6 @@ public class Primary implements Watcher, PrimaryService {
     String getWorkerADDR(String keyString) {
         int hashvalue = Hash(keyString);
         for (String workerkey : workerkeymap.keySet()) {
-            // System.out.println(key);
             int keyStart = Integer.parseInt(workerkeymap.get(workerkey).get(0));
             int keyEnd = Integer.parseInt(workerkeymap.get(workerkey).get(1));
             if (hashvalue >= keyStart && hashvalue < keyEnd) {
@@ -286,7 +283,6 @@ public class Primary implements Watcher, PrimaryService {
         //此函数只在启动master时运行一次
         //可扩展性与workerfail依靠对worker znode的Watcher函数
 
-        System.out.println("Workers:");
         List<String> workerlist = zk.getChildren("/workers", false);
         while (workerlist.isEmpty() || workerlist.size() == 1) {
             Thread.sleep(60);
@@ -294,7 +290,6 @@ public class Primary implements Watcher, PrimaryService {
             workerlist = zk.getChildren("/workers", false);
         }
         for (String w : workerlist) {
-            //System.out.println(w);
             workermap.put(Hash(w), w);
             workerState.put(w, WORKERSTATE.READWRITE);// mark workers as active
         }
