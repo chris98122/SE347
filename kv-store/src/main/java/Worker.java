@@ -12,9 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.UnknownHostException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
@@ -32,10 +30,12 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
     private final String zookeeperaddress;
     ZooKeeper zk;
-    String KeyEnd = null;
-    HashMap<String, ConsumerConfig<WorkerService>> workerConsumerConfigHashMap = new HashMap<String, ConsumerConfig<WorkerService>>();
-    private boolean isPrimary;
+    private String KeyEnd = null;
+
+    volatile private HashMap<String, ConsumerConfig<WorkerService>> workerConsumerConfigHashMap = new HashMap<String, ConsumerConfig<WorkerService>>();
     // stores workerAddr -->ConsumerConfig mapping
+
+    volatile private boolean isPrimary;
     Watcher workerExistsWatcher = new Watcher() {
         public void process(WatchedEvent e) {
             if (e.getType() == Event.EventType.NodeDeleted) {
@@ -69,6 +69,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             }
         }
     };
+    volatile private Set<String> StandByList = new HashSet<String>();
     volatile private String KeyStart = null;
 
     Worker(String zookeeperaddress, String primaryNodeIP, String primaryNodePort, String realIP, String realPort) throws UnknownHostException {
@@ -95,6 +96,28 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         if (w.primaryNodeAddr.equals(w.realAddress))
             w.runForPrimaryDataNode();
 
+        if (w.isPrimary) {
+            {
+                //  make sure there is at least 2 standby node
+//                while(true) {
+//                    if (w.StandByList.size() >= 2) {
+//                        break;
+//                    } else {
+//                        Thread.sleep(100);
+//                    }
+//                }
+            }
+        } else {
+            try {
+                String res = w.GetWorkerServiceByWorkerADDR(w.primaryNodeAddr).RegisterAsStandBy(w.realAddress);
+                if (!res.equals("OK")) {
+                    LOG.error(" RegisterAsStandBy FAIL");
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                LOG.error(String.valueOf(e));
+            }
+        }
 
         TimeUnit.SECONDS.sleep(30);
 
@@ -122,9 +145,9 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
         while (true) {
             TimeUnit.HOURS.sleep(1);//一小时snapshot一次
-            RingoDB.INSTANCE.snapshot();//保存最新的十次snapshot
+            RingoDB.INSTANCE.snapshot();//保存最新的2次snapshot
             snapshotcounter++;
-            if (snapshotcounter >= 10) {
+            if (snapshotcounter >= 3) {
                 // 删除snapshot
                 RingoDB.INSTANCE.delete_oldest_snapshot();
             }
@@ -138,6 +161,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         //System.out.println("MD5加密后的字符串为:encodeStr="+encodeStr);
         return encodeStr.hashCode();
     }
+
 
     boolean checkPrimaryDataNode() {
         while (true) {
@@ -180,6 +204,15 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             LOG.error(String.valueOf(e));
         }
         return "ERR";
+    }
+
+    @Override
+    public String RegisterAsStandBy(String StandByAddr) {
+        // add to standbylist
+        synchronized (StandByList) {
+            StandByList.add(StandByAddr);
+        }
+        return "OK";
     }
 
     // for send rpc to standby node to make data consistant
