@@ -151,7 +151,38 @@ public enum RingoDB implements DB {
         return "snapshot-" + snapshot_version.toString();
     }
 
-    String get_snapshot_name() {
+    public boolean delete_oldest_snapshot() {
+        File file = new File(get_oldest_snapshot_name());
+        if (!file.exists()) {
+            System.out.println("删除文件失败:" + get_oldest_snapshot_name() + "不存在！");
+            return false;
+        } else {
+            return file.delete();
+        }
+    }
+
+    String get_oldest_snapshot_name() {
+        File dir = new File(SNAPSHOT_DIR); //要遍历的目录
+        Integer oldest_snapshot_version = Integer.MAX_VALUE;
+        //System.out.println(dir);
+        if (dir.isDirectory()) {
+            String[] children = dir.list();
+            for (int i = 0; i < children.length; i++) {
+                //System.out.println(children[i]);
+                if (children[i].split("-").length > 1 && children[i].split("-")[0].equals("snapshot")) {
+                    try {
+                        Integer version = Integer.valueOf(children[i].split("-")[1]);
+                        oldest_snapshot_version = Math.min(oldest_snapshot_version, version);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+        return "snapshot-" + oldest_snapshot_version.toString();
+    }
+
+    String get_newest_snapshot_name() {
         File dir = new File(SNAPSHOT_DIR); //要遍历的目录
         //System.out.println(dir);
         if (dir.isDirectory()) {
@@ -206,7 +237,7 @@ public enum RingoDB implements DB {
 
     public void recover() throws IOException, ClassNotFoundException {
         // create an ObjectInputStream for the file we created before
-        ObjectInputStream ois = new ObjectInputStream(new FileInputStream(get_snapshot_name()));
+        ObjectInputStream ois = new ObjectInputStream(new FileInputStream(get_newest_snapshot_name()));
 
         TreeMap<String, String> m1 = (TreeMap<String, String>) ois.readObject();
         if (map.isEmpty()) {

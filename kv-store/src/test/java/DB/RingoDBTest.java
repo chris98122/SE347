@@ -47,6 +47,6 @@ public class RingoDBTest {
 
     @Test
     public void get_snapshot_name() throws IOException {
-        System.out.println(RingoDB.INSTANCE.get_snapshot_name());
+        System.out.println(RingoDB.INSTANCE.get_newest_snapshot_name());
     }
 }

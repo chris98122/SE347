@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
@@ -32,7 +33,9 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     private final String zookeeperaddress;
     ZooKeeper zk;
     String KeyEnd = null;
+    HashMap<String, ConsumerConfig<WorkerService>> workerConsumerConfigHashMap = new HashMap<String, ConsumerConfig<WorkerService>>();
     private boolean isPrimary;
+    // stores workerAddr -->ConsumerConfig mapping
     Watcher workerExistsWatcher = new Watcher() {
         public void process(WatchedEvent e) {
             if (e.getType() == Event.EventType.NodeDeleted) {
@@ -87,14 +90,19 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         Worker w = new Worker(args[0], args[1], args[2], args[3], args[4]);
         w.startZK();
         w.registerRPCServices();// make sure the RPC can work, then register to zookeeper
-        w.runForPrimaryDataNode();
-        // if the worker is a new one, master should call rpc SetKeyRange(startKey,endKey,true)
 
-        // 如果没有收到setKeyRange()就重新连接zookeeper
-        // 这个情况适用于 InitialhashWorkers和ScaleOut 两者中的setKeyRange()
+        // make sure the primaryDataNode get to be the leader
+        if (w.primaryNodeAddr.equals(w.realAddress))
+            w.runForPrimaryDataNode();
+
+
         TimeUnit.SECONDS.sleep(30);
 
-        if(w.isPrimary) {
+        if (w.isPrimary) {
+            // if the worker is a new one, primary should call rpc SetKeyRange(startKey,endKey,true)
+            // 对于leader Data Node来说，
+            // 如果没有收到setKeyRange()就重新连接zookeeper
+            // 这个情况适用于 InitialhashWorkers和ScaleOut 两者中的setKeyRange()
             while (w.KeyStart == null) {
                 LOG.warn("the KeyRange is not initialized,retry");
                 w.zk.close();
@@ -106,15 +114,19 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         }
         LOG.info("register worker watcher");
         w.PrimaryDataNodeExists();
-        //如果是primary data node 在初始化之后注册watcher
+        //如果是primary data node 在初始化KeyRange之后注册watcher
         //如果是standby data node 直接注册watcher
 
+        // 不论是否是primary data node都进行snapshot
         int snapshotcounter = 0;
+
         while (true) {
             TimeUnit.HOURS.sleep(1);//一小时snapshot一次
-            if (snapshotcounter < 10) {
-                RingoDB.INSTANCE.snapshot();//十次snapshot
-                snapshotcounter++;
+            RingoDB.INSTANCE.snapshot();//保存最新的十次snapshot
+            snapshotcounter++;
+            if (snapshotcounter >= 10) {
+                // 删除snapshot
+                RingoDB.INSTANCE.delete_oldest_snapshot();
             }
         }
 
@@ -170,7 +182,29 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         return "ERR";
     }
 
-    DataTransferService GetServiceByWorkerADDR(String WorkerAddr) {
+    // for send rpc to standby node to make data consistant
+    WorkerService GetWorkerServiceByWorkerADDR(String WorkerAddr) {
+        ConsumerConfig<WorkerService> consumerConfig;
+        if (workerConsumerConfigHashMap.get(WorkerAddr) == null) {
+            String workerip = WorkerAddr.split(":")[0];
+            String workerport = WorkerAddr.split(":")[1];
+            consumerConfig = new ConsumerConfig<WorkerService>()
+                    .setInterfaceId(WorkerService.class.getName()) // 指定接口
+                    .setProtocol("bolt") // 指定协议
+                    .setDirectUrl("bolt://" + workerip + ":" + workerport) // 指定直连地址
+                    .setTimeout(2000)
+                    .setRepeatedReferLimit(30); //允许同一interface，同一uniqueId，不同server情况refer 30次，用于单机调试
+
+            workerConsumerConfigHashMap.put(WorkerAddr, consumerConfig);
+        } else {
+            consumerConfig = workerConsumerConfigHashMap.get(WorkerAddr);
+        }
+        // 生成代理类
+
+        return consumerConfig.refer();
+    }
+
+    DataTransferService GetDataTransferServiceByWorkerADDR(String WorkerAddr) {
         ConsumerConfig<DataTransferService> consumerConfig = null;
         try {
             String workerip = WorkerAddr.split(":")[0];
@@ -200,7 +234,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 TreeMap<String, String> data = RingoDB.INSTANCE.SplitTreeMap(NewKeyEnd, oldKeyEnd);
 
                 LOG.info("do datatransfer: " + data);
-                String res = GetServiceByWorkerADDR(WorkerReceiverADRR).DoTransfer(data);
+                String res = GetDataTransferServiceByWorkerADDR(WorkerReceiverADRR).DoTransfer(data);
                 //delete db data
                 if (res.equals("OK")) {
                     RingoDB.INSTANCE.TrunkTreeMap(this.primaryNodeAddr, NewKeyEnd);
@@ -267,6 +301,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     @Override
     public String PUT(String key, String value) {
         try {
+            assert isPrimary;
             checkKeyRange(key);
             RingoDB.INSTANCE.Put(key, value);
             LOG.info("[DB EXECUTION]put" + key + ":" + value);
@@ -281,6 +316,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     @Override
     public String GET(String key) {
         try {
+            assert isPrimary;
             checkKeyRange(key);
             String res = RingoDB.INSTANCE.Get(key);
             LOG.info("[DB EXECUTION] GET" + key + "value:" + res);
@@ -301,6 +337,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     @Override
     public String DELETE(String key) {
         try {
+            assert isPrimary;
             checkKeyRange(key);
             RingoDB.INSTANCE.Delete(key);
             LOG.info("[DB EXECUTION] delete" + key);
@@ -390,13 +427,11 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             } catch (KeeperException.NoNodeException e) {
                 isPrimary = false;
                 break;
-            }catch(KeeperException.NodeExistsException  e)
-            {
+            } catch (KeeperException.NodeExistsException e) {
                 LOG.info(realAddress + " running NodeExists");
                 isPrimary = false;
                 break;
-            }
-            catch (KeeperException.ConnectionLossException ignored) {
+            } catch (KeeperException.ConnectionLossException ignored) {
             } catch (KeeperException | InterruptedException e) {
                 e.printStackTrace();
             }

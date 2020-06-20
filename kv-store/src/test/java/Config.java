@@ -36,7 +36,7 @@ public class Config {
                         w.runForPrimaryDataNode();// if the worker is a new one, master should call rpc SetKeyRange
                         Thread.sleep(12000);
                         //主动断开
-                        System.out.println("worker" + workerID+"fail");
+                        System.out.println("worker" + workerID + "fail");
                         w.zk.close();
                     } catch (Exception e) {
                         e.printStackTrace();
