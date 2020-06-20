@@ -227,12 +227,14 @@ public class Primary implements Watcher, PrimaryService {
             String UnhashedOldKeyEnd = null;
             // use workermap to find  UnhashedOldKeyEnd
             // workermap stores startKey --> workerAddr mapping
-            Iterator iterator = workermap.keySet().iterator();
-            Integer keyStart = null;
+            Iterator iterator = workerkeymap.keySet().iterator();
+            String workeraddr = null;
             while (iterator.hasNext()) {
-                keyStart = (Integer) iterator.next();
-                if (workerkeymap.get(WorkerSenderAddr).get(1).equals(keyStart.toString())) {
-                    UnhashedOldKeyEnd = workermap.get(keyStart);
+                workeraddr = (String) iterator.next();
+                if (workerkeymap.get(WorkerSenderAddr).get(1).equals(Hash(workeraddr).toString())) {
+                    UnhashedOldKeyEnd = workeraddr;
+                    //the UnhashedOldKeyEnd must be some worker's addr
+                    // so we just compare the Hashed value with KeyEnd
                     break;
                 }
             }
