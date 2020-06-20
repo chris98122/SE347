@@ -52,11 +52,11 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     PrimaryDataNodeExists();
                     break;
                 case OK:
-                    // 如果返回OK，判断znode节点是否存在，不存在就竞选runForPrimaryDataNode
-                    if (stat == null) {
-                        LOG.info("worker node not exists, runForPrimaryDataNode()");
-                        runForPrimaryDataNode();
-                    }
+                    //OK就说明存在znode,暂时不做什么
+                    break;
+                case NONODE:
+                    //判断znode节点是否存在，不存在就竞选runForPrimaryDataNode
+                    runForPrimaryDataNode();
                     break;
                 default:
                     // 如果发生意外情况，通过获取节点数据来检查/workers/+primaryNodeAddr 节点是否存在
@@ -93,14 +93,21 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         // 如果没有收到setKeyRange()就重新连接zookeeper
         // 这个情况适用于 InitialhashWorkers和ScaleOut 两者中的setKeyRange()
         TimeUnit.SECONDS.sleep(30);
-        while (w.KeyStart == null) {
-            LOG.warn("the KeyRange is not initialized,retry");
-            w.zk.close();
-            TimeUnit.SECONDS.sleep(10);
-            w.startZK();
-            w.runForPrimaryDataNode();
-            TimeUnit.SECONDS.sleep(30);
+
+        if(w.isPrimary) {
+            while (w.KeyStart == null) {
+                LOG.warn("the KeyRange is not initialized,retry");
+                w.zk.close();
+                TimeUnit.SECONDS.sleep(10);
+                w.startZK();
+                w.runForPrimaryDataNode();
+                TimeUnit.SECONDS.sleep(30);
+            }
         }
+        LOG.info("register worker watcher");
+        w.PrimaryDataNodeExists();
+        //如果是primary data node 在初始化之后注册watcher
+        //如果是standby data node 直接注册watcher
 
         int snapshotcounter = 0;
         while (true) {
@@ -129,6 +136,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 LOG.info(realAddress + "is the primary Data Node");
                 return true;
             } catch (KeeperException.NoNodeException e) {
+                LOG.info("checkPrimaryDataNode :NoNodeException");
                 return false;
             } catch (KeeperException.ConnectionLossException ignored) {
             } catch (InterruptedException | KeeperException e) {
@@ -194,8 +202,10 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 LOG.info("do datatransfer: " + data);
                 String res = GetServiceByWorkerADDR(WorkerReceiverADRR).DoTransfer(data);
                 //delete db data
-                if (res.equals("OK"))
+                if (res.equals("OK")) {
                     RingoDB.INSTANCE.TrunkTreeMap(this.primaryNodeAddr, NewKeyEnd);
+                    this.KeyEnd = Hash(NewKeyEnd).toString();
+                }
                 // use primaryNodeAddr, because Hash(primaryNodeAddr) == KeyStart
                 return res;
             } catch (Exception e) {
@@ -380,7 +390,13 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             } catch (KeeperException.NoNodeException e) {
                 isPrimary = false;
                 break;
-            } catch (KeeperException.ConnectionLossException ignored) {
+            }catch(KeeperException.NodeExistsException  e)
+            {
+                LOG.info(realAddress + " running NodeExists");
+                isPrimary = false;
+                break;
+            }
+            catch (KeeperException.ConnectionLossException ignored) {
             } catch (KeeperException | InterruptedException e) {
                 e.printStackTrace();
             }

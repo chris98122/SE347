@@ -34,8 +34,9 @@ public class Config {
                         w.startZK();
                         w.registerRPCServices();// make sure the RPC can work, then register to zookeeper
                         w.runForPrimaryDataNode();// if the worker is a new one, master should call rpc SetKeyRange
-                        Thread.sleep(2000);
+                        Thread.sleep(12000);
                         //主动断开
+                        System.out.println("worker" + workerID+"fail");
                         w.zk.close();
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -61,7 +62,7 @@ public class Config {
                     }
                 }
         );
-        t.setName("worker" + workerID);
+        t.setName("PrimaryWorker" + workerID);
         t.setDaemon(true);
         t.start();
     }
@@ -80,7 +81,7 @@ public class Config {
                     }
                 }
         );
-        t.setName("worker" + workerID);
+        t.setName("StandbyWorker" + workerID);
         t.setDaemon(true);
         t.start();
     }
