@@ -90,14 +90,16 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         w.runForPrimaryDataNode();
         // if the worker is a new one, master should call rpc SetKeyRange(startKey,endKey,true)
 
-        // 等60秒，如果没有收到setKeyRange()就重新连接zookeeper
+        // 如果没有收到setKeyRange()就重新连接zookeeper
         // 这个情况适用于 InitialhashWorkers和ScaleOut 两者中的setKeyRange()
-        TimeUnit.MINUTES.sleep(1);
+        TimeUnit.SECONDS.sleep(30);
         while (w.KeyStart == null) {
-            LOG.warn("the scale out is not started,retry");
+            LOG.warn("the KeyRange is not initialized,retry");
             w.zk.close();
+            TimeUnit.SECONDS.sleep(10);
+            w.startZK();
             w.runForPrimaryDataNode();
-            TimeUnit.MINUTES.sleep(1);
+            TimeUnit.SECONDS.sleep(30);
         }
 
         int snapshotcounter = 0;

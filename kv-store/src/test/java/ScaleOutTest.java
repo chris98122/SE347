@@ -56,7 +56,8 @@ public class ScaleOutTest {
 
         Thread.sleep(3000);
         StoreLargeData(101, 200);
-        Thread.sleep(3000);
+        while (true)
+            Thread.sleep(3000);
     }
 
     @Test

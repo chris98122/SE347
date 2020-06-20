@@ -63,4 +63,23 @@ public class Config {
         t.setDaemon(true);
         t.start();
     }
+
+    static public void StartStandbyWorker(Integer workerID) {
+        Thread t = new Thread(
+                () ->
+                {
+                    try {
+                        String workerargs[] = {Config.zookeeperHost, PrivateData.ip, "1230" + workerID.toString(),
+                                PrivateData.ip, "1240" + workerID.toString()
+                        };
+                        Worker.main(workerargs);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+        );
+        t.setName("worker" + workerID);
+        t.setDaemon(true);
+        t.start();
+    }
 }

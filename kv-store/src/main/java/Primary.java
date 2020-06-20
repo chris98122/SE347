@@ -285,7 +285,7 @@ public class Primary implements Watcher, PrimaryService {
 
         List<String> workerlist = zk.getChildren("/workers", false);
         while (workerlist.isEmpty() || workerlist.size() == 1) {
-            Thread.sleep(60);
+            Thread.sleep(600);
             LOG.warn("InitialhashWorkers(): workers not exist.");
             workerlist = zk.getChildren("/workers", false);
         }
@@ -514,7 +514,6 @@ public class Primary implements Watcher, PrimaryService {
             if (newWorkerNum >= 1) {
                 LOG.info(newWorkerNum + " new workers");
 
-                //一个时间只能有一个ScaleOut 线程
                 try {
                     ScaleOutLatch.await();
                 } catch (InterruptedException e) {
