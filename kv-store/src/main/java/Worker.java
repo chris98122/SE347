@@ -129,7 +129,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             while (w.KeyStart == null) {
                 LOG.warn("the KeyRange is not initialized,retry");
                 w.zk.close();
-                TimeUnit.SECONDS.sleep(10);
+                TimeUnit.SECONDS.sleep(5);
                 w.startZK();
                 w.runForPrimaryDataNode();
                 TimeUnit.SECONDS.sleep(30);
@@ -456,6 +456,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 // create master znode should use CreateMode.EPHEMERAL
                 // so the znode would be deleted when the connection is lost
                 isPrimary = true;
+                LOG.info(realAddress + "is PrimaryDataNode");
                 break;
             } catch (KeeperException.NoNodeException e) {
                 isPrimary = false;

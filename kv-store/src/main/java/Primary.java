@@ -14,6 +14,7 @@ import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
 
@@ -39,9 +40,9 @@ public class Primary implements Watcher, PrimaryService {
     // e.g 212.64.64.185:12201  --> [-399182218,1302869320]
     // KeyStart is Hash(workerAddr)
 
-    HashMap<String, ConsumerConfig<WorkerService>> workerConsumerConfigHashMap = new HashMap<String, ConsumerConfig<WorkerService>>();
+    volatile HashMap<String, ConsumerConfig<WorkerService>> workerConsumerConfigHashMap = new HashMap<String, ConsumerConfig<WorkerService>>();
     // stores workerAddr -->ConsumerConfig mapping
-    // the ConsumerConfig may change to standby node dur to worker failure
+    // the ConsumerConfig may change to standby node due to worker failure
 
     volatile HashMap<String, WORKERSTATE> workerState = new HashMap<>();
 
@@ -51,6 +52,8 @@ public class Primary implements Watcher, PrimaryService {
     CountDownLatch ScaleOutLatch = new CountDownLatch(0);
 
     CountDownLatch ProcessWorkerChangeLatch = new CountDownLatch(0);
+
+    volatile HashMap<String, ReentrantReadWriteLock> keyRWLockMap = new HashMap<String, ReentrantReadWriteLock>();
 
     AsyncCallback.StringCallback createParentCallback = new AsyncCallback.StringCallback() {
         @Override
@@ -161,8 +164,28 @@ public class Primary implements Watcher, PrimaryService {
                 //spin
                 LOG.info(WorkerAddr + "can not put");
                 return "the service is not available right now.";
-            } else
-                return workerService.PUT(key, value);
+            } else {
+                ReentrantReadWriteLock lock;
+                if (keyRWLockMap.containsKey(key)) {
+                    lock = keyRWLockMap.get(key);
+                } else {
+                    lock = new ReentrantReadWriteLock();
+                    keyRWLockMap.put(key, lock);
+                }
+
+                lock.writeLock().lock();
+                LOG.info(" get lock ");
+                String res = workerService.PUT(key, value);
+                if (!lock.hasQueuedThreads()) {
+                    lock.writeLock().unlock();
+                    keyRWLockMap.remove(key);
+                    LOG.info(" keyRWLockMap.remove(key) ");
+                } else {
+                    LOG.info("hasQueuedThreads");
+                    lock.writeLock().unlock();
+                }
+                return res;
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -178,8 +201,25 @@ public class Primary implements Watcher, PrimaryService {
             if (workerState.get(WorkerAddr).equals(WORKERSTATE.FAIL)) {
                 LOG.info(WorkerAddr + "can not GET");
                 return "the service is not available right now.";
-            } else
-                return workerService.GET(key);
+            } else {
+                ReentrantReadWriteLock lock;
+                if (keyRWLockMap.containsKey(key)) {
+                    lock = keyRWLockMap.get(key);
+                } else {
+                    lock = new ReentrantReadWriteLock();
+                    keyRWLockMap.put(key, lock);
+                }
+                lock.readLock().lock();
+                String res = workerService.GET(key);
+                if (!lock.hasQueuedThreads()) {
+                    lock.readLock().unlock();
+                    keyRWLockMap.remove(key);
+                } else {
+                    LOG.info("hasQueuedThreads");
+                    lock.readLock().unlock();
+                }
+                return res;
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -196,8 +236,25 @@ public class Primary implements Watcher, PrimaryService {
                 //spin
                 LOG.info(WorkerAddr + "can not delete");
                 return "the service is not available right now.";
-            } else
-                return workerService.DELETE(key);
+            } else {
+                ReentrantReadWriteLock lock;
+                if (keyRWLockMap.containsKey(key)) {
+                    lock = keyRWLockMap.get(key);
+                } else {
+                    lock = new ReentrantReadWriteLock();
+                    keyRWLockMap.put(key, lock);
+                }
+                lock.writeLock().lock();
+                String res = workerService.DELETE(key);
+                if (!lock.hasQueuedThreads()) {
+                    lock.writeLock().unlock();
+                    keyRWLockMap.remove(key);
+                } else {
+                    LOG.info("hasQueuedThreads");
+                    lock.writeLock().unlock();
+                }
+                return res;
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
