@@ -42,7 +42,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     Watcher workerExistsWatcher = new Watcher() {
         public void process(WatchedEvent e) {
             LOG.info("workerExistsWatcher" + e.getPath());
-            PrimaryDataNodeExists();//watcher是一次性的所以必须再次注册
+            registerWorkerWatcher();//watcher是一次性的所以必须再次注册
             if (e.getType() == Event.EventType.NodeDeleted) {
                 assert ("/workers/" + primaryNodeAddr).equals(e.getPath());
                 //如果是自己所属的worker断开连接,则尝试自己成为PrimaryDtaNode
@@ -144,7 +144,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             }
         }
         LOG.info("register worker watcher");
-        w.PrimaryDataNodeExists();
+        w.registerWorkerWatcher();
         //如果是primary data node 在初始化KeyRange之后注册watcher
         //如果是standby data node 直接注册watcher
 
@@ -170,12 +170,24 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         return encodeStr.hashCode();
     }
 
+    public void registerWorkerWatcher() {
+        try {
+            zk.exists("/workers/" + this.primaryNodeAddr, workerExistsWatcher);
+        } catch (KeeperException.NoNodeException e) {
+            LOG.info("NoNodeException in registerWorkerWatcher");
+        } catch (KeeperException.ConnectionLossException ignored) {
+            LOG.info("KeeperException.ConnectionLossException");
+        } catch (KeeperException | InterruptedException e) {
+            e.printStackTrace();
+            LOG.error(String.valueOf(e));
+        }
+    }
 
     boolean checkPrimaryDataNode() {
         while (true) {
             try {
                 Stat stat = new Stat();
-                byte[] data = zk.getData("/workers/" + primaryNodeAddr, workerExistsWatcher, stat);
+                byte[] data = zk.getData("/workers/" + primaryNodeAddr, null, stat);
                 isPrimary = new String(data).equals(realAddress);
                 if (isPrimary) {
                     LOG.info(realAddress + "is already the primary Data Node");
@@ -200,6 +212,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             } catch (KeeperException.ConnectionLossException ignored) {
             } catch (InterruptedException | KeeperException e) {
                 e.printStackTrace();
+                LOG.error(String.valueOf(e));
             }
         }
     }
@@ -515,7 +528,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     }
 
     void PrimaryDataNodeExists() {
-        zk.exists("/workers" + primaryNodeAddr, workerExistsWatcher, workerExistsCallback, null);
+        zk.exists("/workers" + primaryNodeAddr, null, workerExistsCallback, null);
     }
 
     void runForPrimaryDataNode() {
