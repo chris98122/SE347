@@ -114,7 +114,8 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             }
         }
 
-        TimeUnit.SECONDS.sleep(30);
+        while (w.StandBySet.size() < 2)
+            TimeUnit.SECONDS.sleep(30);
 
         if (w.isPrimary) {
             // if the worker is a new one, primary should call rpc SetKeyRange(startKey,endKey,true)
@@ -332,11 +333,22 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
     @Override
     public String PUT(String key, String value) {
+
         try {
             assert isPrimary;
             checkKeyRange(key);
             RingoDB.INSTANCE.Put(key, value);
             LOG.info("[DB EXECUTION]put" + key + ":" + value);
+            {
+                // 主节点通过异步的方式将新的数据同步到对应的从节点，
+                // 不过在某些情况下会造成写丢失
+                CopyToStandBy copyToStandBy = new CopyToStandBy();
+                copyToStandBy.key = key;
+                copyToStandBy.value = value;
+                copyToStandBy.execution = EXECUTION.PUT;
+                copyToStandBy.setName("CopyToStandBy put" + key);
+                copyToStandBy.start();
+            }
             return "OK";
         } catch (RingoDBException | MWException e) {
             e.printStackTrace();
@@ -373,6 +385,15 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             checkKeyRange(key);
             RingoDB.INSTANCE.Delete(key);
             LOG.info("[DB EXECUTION] delete" + key);
+            {
+                // 主节点通过异步的方式将新的数据同步到对应的从节点，
+                // 不过在某些情况下会造成写丢失
+                CopyToStandBy copyToStandBy = new CopyToStandBy();
+                copyToStandBy.key = key;
+                copyToStandBy.execution = EXECUTION.DELETE;
+                copyToStandBy.setName("CopyToStandBy delete" + key);
+                copyToStandBy.start();
+            }
             return "OK";
         } catch (RingoDBException e) {
             e.printStackTrace();
@@ -469,6 +490,20 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 e.printStackTrace();
             }
             if (checkPrimaryDataNode()) break;
+        }
+    }
+
+    public enum EXECUTION {
+        PUT, DELETE
+    }
+
+    class CopyToStandBy extends Thread {
+        public String key = null;
+        public String value = null;
+        EXECUTION execution = null;
+
+        public void run() {
+            LOG.info("copyToStandBy");
         }
     }
 
