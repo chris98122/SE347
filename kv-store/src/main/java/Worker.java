@@ -550,7 +550,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                         LOG.info(standbyAddr + " " + res);
                     }
                 } catch (Exception e) {
-                    LOG.error(String.valueOf(e.getStackTrace()));
+                    LOG.error(e.getStackTrace().toString());
                     LOG.error(String.valueOf(e));
                 }
             }
