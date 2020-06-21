@@ -36,7 +36,6 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     // stores workerAddr -->ConsumerConfig mapping
 
     volatile private boolean isPrimary;
-    volatile private Set<String> StandBySet = new HashSet<String>();
     Watcher workerExistsWatcher = new Watcher() {
         public void process(WatchedEvent e) {
             if (e.getType() == Event.EventType.NodeDeleted) {
@@ -70,6 +69,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             }
         }
     };
+    volatile private Set<String> StandBySet = new HashSet<String>();
     volatile private String KeyStart = null;
 
     Worker(String zookeeperaddress, String primaryNodeIP, String primaryNodePort, String realIP, String realPort) throws UnknownHostException {
@@ -226,9 +226,11 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     public String RegisterAsStandBy(String StandByAddr) {
         // add to standbylist
         synchronized (StandBySet) {
-            if (this.isPrimary)
+            if (this.isPrimary) {
+                LOG.info("StandBySet.add " + StandByAddr);
                 StandBySet.add(StandByAddr);
-            else {
+            } else {
+                LOG.info("not Primary Data NODE,can't add standby");
                 return "ERR";
             }
         }
@@ -502,7 +504,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 // so the znode would be deleted when the connection is lost
 
                 // reach here means create success, which means this is the leader node
-                this.StandBySet.clear();
+                // this.StandBySet.clear();
                 isPrimary = true;
                 LOG.info(realAddress + " is PrimaryDataNode");
                 break;
