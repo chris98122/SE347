@@ -38,17 +38,6 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     // stores workerAddr -->ConsumerConfig mapping
 
     volatile private boolean isPrimary;
-    Watcher workerExistsWatcher = new Watcher() {
-        public void process(WatchedEvent e) {
-            LOG.info("workerExistsWatcher" + e.getPath());
-            PrimaryDataNodeExists();//watcher是一次性的所以必须再次注册
-            if (e.getType() == Event.EventType.NodeDeleted) {
-                assert ("/workers/" + primaryNodeAddr).equals(e.getPath());
-                //如果是自己所属的worker断开连接,则尝试自己成为PrimaryDtaNode
-                runForPrimaryDataNode();
-            }
-        }
-    };
     AsyncCallback.StatCallback workerExistsCallback = new AsyncCallback.StatCallback() {
         @Override
         public void processResult(int rc, String path, Object ctx, Stat stat) {
@@ -70,6 +59,17 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     LOG.info("sth is wrong, checkPrimaryDataNode()");
                     checkPrimaryDataNode();
                     break;
+            }
+        }
+    };
+    Watcher workerExistsWatcher = new Watcher() {
+        public void process(WatchedEvent e) {
+            LOG.info("workerExistsWatcher" + e.getPath());
+            PrimaryDataNodeExists();//watcher是一次性的所以必须再次注册
+            if (e.getType() == Event.EventType.NodeDeleted) {
+                assert ("/workers/" + primaryNodeAddr).equals(e.getPath());
+                //如果是自己所属的worker断开连接,则尝试自己成为PrimaryDtaNode
+                runForPrimaryDataNode();
             }
         }
     };
@@ -174,7 +174,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         while (true) {
             try {
                 Stat stat = new Stat();
-                byte[] data = zk.getData("/workers/" + primaryNodeAddr, false, stat);
+                byte[] data = zk.getData("/workers/" + primaryNodeAddr, workerExistsWatcher, stat);
                 isPrimary = new String(data).equals(realAddress);
                 if (isPrimary) {
                     LOG.info(realAddress + "is already the primary Data Node");
@@ -317,7 +317,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
     @Override
     public String SetKeyRange(String keystart, String keyend, boolean dataTranfer) {
-        if (this.StandBySet.size() < 2) {
+        if (this.primaryNodeAddr.equals(this.realAddress) && this.StandBySet.size() < 2) {
             LOG.warn("StandByNotReady");
             return "ERR";
         }
