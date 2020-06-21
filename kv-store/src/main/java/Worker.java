@@ -38,6 +38,17 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     // stores workerAddr -->ConsumerConfig mapping
 
     volatile private boolean isPrimary;
+    Watcher workerExistsWatcher = new Watcher() {
+        public void process(WatchedEvent e) {
+            LOG.info("workerExistsWatcher" + e.getPath());
+            PrimaryDataNodeExists();//watcher是一次性的所以必须再次注册
+            if (e.getType() == Event.EventType.NodeDeleted) {
+                assert ("/workers/" + primaryNodeAddr).equals(e.getPath());
+                //如果是自己所属的worker断开连接,则尝试自己成为PrimaryDtaNode
+                runForPrimaryDataNode();
+            }
+        }
+    };
     AsyncCallback.StatCallback workerExistsCallback = new AsyncCallback.StatCallback() {
         @Override
         public void processResult(int rc, String path, Object ctx, Stat stat) {
@@ -59,17 +70,6 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     LOG.info("sth is wrong, checkPrimaryDataNode()");
                     checkPrimaryDataNode();
                     break;
-            }
-        }
-    };
-    Watcher workerExistsWatcher = new Watcher() {
-        public void process(WatchedEvent e) {
-            LOG.info("workerExistsWatcher" + e.getPath());
-            PrimaryDataNodeExists();//watcher是一次性的所以必须再次注册
-            if (e.getType() == Event.EventType.NodeDeleted) {
-                assert ("/workers/" + primaryNodeAddr).equals(e.getPath());
-                //如果是自己所属的worker断开连接,则尝试自己成为PrimaryDtaNode
-                runForPrimaryDataNode();
             }
         }
     };
@@ -387,16 +387,17 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     @Override
     public String PUT(String key, String value) {
         try {
-            assert isPrimary;
             checkKeyRange(key);
             RingoDB.INSTANCE.Put(key, value);
             LOG.info("[DB EXECUTION]put" + key + ":" + value);
             {
                 // 主节点通过异步的方式将新的数据同步到对应的从节点，
                 // 不过在某些情况下会造成写丢失
-                CopyToStandBy copyToStandBy = new CopyToStandBy(key, value, StandBySet, EXECUTION.PUT);
-                copyToStandBy.setName("CopyToStandBy put" + key);
-                copyToStandBy.start();
+                if (isPrimary) {
+                    CopyToStandBy copyToStandBy = new CopyToStandBy(key, value, StandBySet, EXECUTION.PUT);
+                    copyToStandBy.setName("CopyToStandBy put" + key);
+                    copyToStandBy.start();
+                }
             }
             return "OK";
         } catch (RingoDBException | MWException e) {
@@ -430,16 +431,17 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     @Override
     public String DELETE(String key) {
         try {
-            assert isPrimary;
             checkKeyRange(key);
             RingoDB.INSTANCE.Delete(key);
             LOG.info("[DB EXECUTION] delete" + key);
             {
                 // 主节点通过异步的方式将新的数据同步到对应的从节点，
                 // 不过在某些情况下会造成写丢失
-                CopyToStandBy copyToStandBy = new CopyToStandBy(key, null, StandBySet, EXECUTION.DELETE);
-                copyToStandBy.setName("CopyToStandBy delete" + key);
-                copyToStandBy.start();
+                if (isPrimary) {
+                    CopyToStandBy copyToStandBy = new CopyToStandBy(key, null, StandBySet, EXECUTION.DELETE);
+                    copyToStandBy.setName("CopyToStandBy delete" + key);
+                    copyToStandBy.start();
+                }
             }
             return "OK";
         } catch (RingoDBException e) {
