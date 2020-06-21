@@ -13,7 +13,7 @@ public class doPUTandGET {
         try {
             Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
 
-            TimeUnit.MINUTES.sleep(1);
+            TimeUnit.SECONDS.sleep(15);
 
             // 存入data
             Config.StoreLargeData(0, 100);
@@ -27,13 +27,13 @@ public class doPUTandGET {
             int storedatatcounter = 1;
 
             while (true) {
-                TimeUnit.SECONDS.sleep(30);
                 if (storedatatcounter < 20) {
                     Config.StoreLargeData(storedatatcounter * 10, 10);
                     storedatatcounter++;
                 } else {
                     TimeUnit.HOURS.sleep(1);
                 }
+                TimeUnit.SECONDS.sleep(30);
             }
         } catch (Exception e) {
 
