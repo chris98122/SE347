@@ -322,6 +322,25 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 this.KeyStart = keystart;
                 this.KeyEnd = keyend;
                 LOG.info("initialize keyrage to " + keystart + ":" + keyend);
+                if (this.isPrimary) {
+                    Thread t = new Thread(() -> {
+                        for (String standbyAddr : this.StandBySet) {
+                            try {
+                                String res = GetWorkerServiceByWorkerADDR(standbyAddr).SetKeyRange(this.KeyStart, this.KeyEnd, false);
+                                if (!res.equals("OK")) {
+                                    LOG.error(" Set STANDBY KeyRange FAIL");
+                                } else {
+                                    LOG.info("Set STANDBY KeyRange OK");
+                                }
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                                LOG.error(String.valueOf(e));
+                            }
+                        }
+                    });
+                    t.setName("Set STANDBY KeyRange");
+                    t.start();
+                }
                 return "OK";
             }
         } else {
@@ -347,15 +366,17 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
     private void checkKeyRange(String keyString) throws MWException {
         int hashvalue = Hash(keyString);
-        if (hashvalue >= Integer.parseInt(this.KeyStart) && hashvalue < Integer.parseInt(this.KeyEnd)) {
-            {
+        if (this.KeyStart != null) {
+            if (hashvalue >= Integer.parseInt(this.KeyStart) && hashvalue < Integer.parseInt(this.KeyEnd)) {
+                {
 
+                }
+            } else if ((hashvalue < Integer.parseInt(this.KeyEnd) | hashvalue >= Integer.parseInt(this.KeyStart)) && Integer.parseInt(this.KeyStart) > Integer.parseInt(this.KeyEnd)) {
+                {
+                }
+            } else {
+                throw new MWException("Dispatch wrong key to worker");
             }
-        } else if ((hashvalue < Integer.parseInt(this.KeyEnd) | hashvalue >= Integer.parseInt(this.KeyStart)) && Integer.parseInt(this.KeyStart) > Integer.parseInt(this.KeyEnd)) {
-            {
-            }
-        } else {
-            throw new MWException("Dispatch wrong key to worker");
         }
     }
 
