@@ -654,6 +654,8 @@ public class Primary implements Watcher, PrimaryService {
                                 res = workerReiverService.SetKeyRange(workerReceiverKeyStart, workerReceiverKeyEnd, true);
                                 if (res.equals("OK"))
                                     break;
+                                else
+                                    retrycounter++;
                             } catch (SofaRpcException e) {
                                 retrycounter++;
                                 LOG.info("retry workerReiverService.SetKeyRange()");
