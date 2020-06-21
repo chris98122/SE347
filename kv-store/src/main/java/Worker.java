@@ -16,11 +16,13 @@ import java.io.StringWriter;
 import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
 
 public class Worker implements Watcher, WorkerService, DataTransferService {
     private static final Logger LOG = LoggerFactory.getLogger(Worker.class);
+    private static ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     // primary data node metadata
     private final String primaryNodeIP;
     private final String primaryNodePort;
@@ -29,15 +31,25 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     private final String realAddress;
     private final String realIP;
     private final String realPort;
-
     private final String zookeeperaddress;
     ZooKeeper zk;
+    volatile private Set<String> StandBySet = new HashSet<String>();
+    volatile private String KeyStart = null;
     private String KeyEnd = null;
-
-    volatile private HashMap<String, ConsumerConfig<WorkerService>> workerConsumerConfigHashMap = new HashMap<String, ConsumerConfig<WorkerService>>();
     // stores workerAddr -->ConsumerConfig mapping
-
+    volatile private HashMap<String, ConsumerConfig<WorkerService>> workerConsumerConfigHashMap = new HashMap<String, ConsumerConfig<WorkerService>>();
     volatile private boolean isPrimary;
+    Watcher workerExistsWatcher = new Watcher() {
+        public void process(WatchedEvent e) {
+            LOG.info("workerExistsWatcher" + e.getPath());
+            PrimaryDataNodeExists();//watcher是一次性的所以必须再次注册
+            if (e.getType() == Event.EventType.NodeDeleted) {
+                assert ("/workers/" + primaryNodeAddr).equals(e.getPath());
+                //如果是自己所属的worker断开连接,则尝试自己成为PrimaryDtaNode
+                runForPrimaryDataNode();
+            }
+        }
+    };
     AsyncCallback.StatCallback workerExistsCallback = new AsyncCallback.StatCallback() {
         @Override
         public void processResult(int rc, String path, Object ctx, Stat stat) {
@@ -62,19 +74,6 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             }
         }
     };
-    Watcher workerExistsWatcher = new Watcher() {
-        public void process(WatchedEvent e) {
-            LOG.info("workerExistsWatcher" + e.getPath());
-            PrimaryDataNodeExists();//watcher是一次性的所以必须再次注册
-            if (e.getType() == Event.EventType.NodeDeleted) {
-                assert ("/workers/" + primaryNodeAddr).equals(e.getPath());
-                //如果是自己所属的worker断开连接,则尝试自己成为PrimaryDtaNode
-                runForPrimaryDataNode();
-            }
-        }
-    };
-    volatile private Set<String> StandBySet = new HashSet<String>();
-    volatile private String KeyStart = null;
 
     Worker(String zookeeperaddress, String primaryNodeIP, String primaryNodePort, String realIP, String realPort) throws UnknownHostException {
 
@@ -129,6 +128,8 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             // 对于leader Data Node来说，
             // 如果没有收到setKeyRange()就重新连接zookeeper
             // 这个情况适用于 InitialhashWorkers和ScaleOut 两者中的setKeyRange()
+
+            TimeUnit.MINUTES.sleep(1);
             while (w.KeyStart == null) {
                 LOG.warn("the KeyRange is not initialized,retry");
                 w.zk.close();
