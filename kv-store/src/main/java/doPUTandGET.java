@@ -27,9 +27,9 @@ public class doPUTandGET {
             int storedatatcounter = 1;
 
             while (true) {
-                TimeUnit.MINUTES.sleep(10);
-                if (storedatatcounter < 10) {
-                    Config.StoreLargeData(storedatatcounter * 100, 100);
+                TimeUnit.SECONDS.sleep(30);
+                if (storedatatcounter < 20) {
+                    Config.StoreLargeData(storedatatcounter * 10, 10);
                     storedatatcounter++;
                 } else {
                     TimeUnit.HOURS.sleep(1);
