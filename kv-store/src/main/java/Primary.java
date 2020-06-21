@@ -75,27 +75,6 @@ public class Primary implements Watcher, PrimaryService {
             }
         }
     };
-    AsyncCallback.ChildrenCallback workerGetChildrenCallback = new AsyncCallback.ChildrenCallback() {
-        @Override
-        public void processResult(int rc, String path, Object ctx, List<String> children) {
-            switch (KeeperException.Code.get(rc)) {
-                case CONNECTIONLOSS:
-                    try {
-                        LOG.info("retry get workers");
-                        getWorkers();
-                    } catch (KeeperException | InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    break;
-                case OK:
-                    LOG.info("Successfully got a list of workers:" + children.size() + "workers");
-                    LOG.info(String.valueOf(children));
-                    break;
-                default:
-                    LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
-            }
-        }
-    };
     //主节点等待从节点的变化（包括worker node fail 或者 增加）
     //ZooKeeper客户端也可以通过getData，getChildren和exist三个接口来向ZooKeeper服务器注册Watcher
     Watcher workersChangeWatcher = new Watcher() {
@@ -123,6 +102,27 @@ public class Primary implements Watcher, PrimaryService {
             }
         }
     };
+    AsyncCallback.ChildrenCallback workerGetChildrenCallback = new AsyncCallback.ChildrenCallback() {
+        @Override
+        public void processResult(int rc, String path, Object ctx, List<String> children) {
+            switch (KeeperException.Code.get(rc)) {
+                case CONNECTIONLOSS:
+                    try {
+                        LOG.info("retry get workers");
+                        getWorkers();
+                    } catch (KeeperException | InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    break;
+                case OK:
+                    LOG.info("Successfully got a list of workers:" + children.size() + "workers");
+                    LOG.info(String.valueOf(children));
+                    break;
+                default:
+                    LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
+            }
+        }
+    };
 
     Primary(String hostPort, String ip) throws UnknownHostException {
         this.hostPort = hostPort;
@@ -140,7 +140,7 @@ public class Primary implements Watcher, PrimaryService {
             LOG.info("serverId:" + serverId);
             m.boostrap();
 
-            while(m.workerState.size() <= 2)// block until initialize at 2 workers
+            while (m.workerState.size() <= 2)// block until initialize at 2 workers
                 m.InitialhashWorkers();
 
             m.getWorkers();//register the "/worker"" Watcher
@@ -382,25 +382,26 @@ public class Primary implements Watcher, PrimaryService {
             WorkerService workerService = GetServiceByWorkerADDR(workerAddr);
             int retrycounter = 0;
             while (retrycounter < 10) {
+                String res = null;
                 try {
-                    String res = workerService.SetKeyRange(workerkeymap.get(workerAddr).get(0), workerkeymap.get(workerAddr).get(1), false);
+                    res = workerService.SetKeyRange(workerkeymap.get(workerAddr).get(0), workerkeymap.get(workerAddr).get(1), false);
                     LOG.info("[RPC RESPONSE]" + res);
-                    if (res.equals("OK")) {
-                        workerState.put(workerAddr, WORKERSTATE.READWRITE);// mark workers as active
-                        break;
-                    } else {
-                        retrycounter++;
-                        TimeUnit.SECONDS.sleep(5);
-                        LOG.info("InitialhashWorkers: retry SetKeyRange");
-                    }
                 } catch (SofaRpcException e) {
+                    LOG.error(String.valueOf(e));
+                }
+                if (res.equals("OK")) {
+                    workerState.put(workerAddr, WORKERSTATE.READWRITE);// mark workers as active
+                    break;
+                } else {
                     retrycounter++;
-                    LOG.error(String.valueOf(e));
+                    try {
+                        TimeUnit.SECONDS.sleep(5);
+                    } catch (InterruptedException e) {
+                        LOG.error(String.valueOf(e));
+                    }
+                    LOG.info("InitialhashWorkers: retry SetKeyRange");
                 }
-                catch(InterruptedException e)
-                {
-                    LOG.error(String.valueOf(e));
-                }
+
             }
         }
     }
