@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -74,27 +75,6 @@ public class Primary implements Watcher, PrimaryService {
             }
         }
     };
-    AsyncCallback.ChildrenCallback workerGetChildrenCallback = new AsyncCallback.ChildrenCallback() {
-        @Override
-        public void processResult(int rc, String path, Object ctx, List<String> children) {
-            switch (KeeperException.Code.get(rc)) {
-                case CONNECTIONLOSS:
-                    try {
-                        LOG.info("retry get workers");
-                        getWorkers();
-                    } catch (KeeperException | InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    break;
-                case OK:
-                    LOG.info("Successfully got a list of workers:" + children.size() + "workers");
-                    LOG.info(String.valueOf(children));
-                    break;
-                default:
-                    LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
-            }
-        }
-    };
     //主节点等待从节点的变化（包括worker node fail 或者 增加）
     //ZooKeeper客户端也可以通过getData，getChildren和exist三个接口来向ZooKeeper服务器注册Watcher
     Watcher workersChangeWatcher = new Watcher() {
@@ -122,6 +102,27 @@ public class Primary implements Watcher, PrimaryService {
             }
         }
     };
+    AsyncCallback.ChildrenCallback workerGetChildrenCallback = new AsyncCallback.ChildrenCallback() {
+        @Override
+        public void processResult(int rc, String path, Object ctx, List<String> children) {
+            switch (KeeperException.Code.get(rc)) {
+                case CONNECTIONLOSS:
+                    try {
+                        LOG.info("retry get workers");
+                        getWorkers();
+                    } catch (KeeperException | InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    break;
+                case OK:
+                    LOG.info("Successfully got a list of workers:" + children.size() + "workers");
+                    LOG.info(String.valueOf(children));
+                    break;
+                default:
+                    LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
+            }
+        }
+    };
 
     Primary(String hostPort, String ip) throws UnknownHostException {
         this.hostPort = hostPort;
@@ -138,7 +139,10 @@ public class Primary implements Watcher, PrimaryService {
             LOG.info("I'm the leader.");
             LOG.info("serverId:" + serverId);
             m.boostrap();
-            m.InitialhashWorkers();// block until initialize at 2 workers
+
+            while (m.workerState.size() <= 2)// block until initialize at 2 workers
+                m.InitialhashWorkers();
+
             m.getWorkers();//register the "/worker"" Watcher
 
             m.registerRPCServices(); //after setting the Master-Worker , the Master can receive rpc from clients
@@ -386,7 +390,7 @@ public class Primary implements Watcher, PrimaryService {
                         break;
                     } else {
                         retrycounter++;
-                        Thread.sleep(1000);
+                        TimeUnit.SECONDS.sleep(5);
                         LOG.info("InitialhashWorkers: retry SetKeyRange");
                     }
                 } catch (SofaRpcException e) {
@@ -394,7 +398,6 @@ public class Primary implements Watcher, PrimaryService {
                     LOG.error(String.valueOf(e));
                 }
             }
-
         }
     }
 
@@ -492,8 +495,6 @@ public class Primary implements Watcher, PrimaryService {
 
     public void boostrap() {
         createParent("/workers", new byte[0]);
-        createParent("/assign", new byte[0]);
-        createParent("/tasks", new byte[0]);
     }
 
     public void process(WatchedEvent e) {
