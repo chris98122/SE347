@@ -36,10 +36,16 @@ public class Client implements Watcher {
                     LOG.info("get primary ip " + primaryip);
                     break;
                 case NONODE:
-                    zk.getData("/primary", false, readprimaryCallback, null);
                     LOG.info("no node primary,retry");
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    zk.getData("/primary", false, readprimaryCallback, null);
+                    break;
                 default:
-                    LOG.error("somthing went wrong" + KeeperException.create(KeeperException.Code.get(rc), path));
+                    LOG.error("something went wrong" + KeeperException.create(KeeperException.Code.get(rc), path));
             }
         }
     };
@@ -74,18 +80,25 @@ public class Client implements Watcher {
     }
 
     public PrimaryService PrimaryConnection() {
-        zk.getData("/primary", false, readprimaryCallback, null);
-        while (primaryip == null) {
-            //block until get primary ip
+        PrimaryService primaryService = null;
+        try {
+            zk.getData("/primary", false, readprimaryCallback, null);
+            while (primaryip == null) {
+                //block until get primary ip
+            }
+            ConsumerConfig<PrimaryService> consumerConfig = new ConsumerConfig<PrimaryService>()
+                    .setInterfaceId(PrimaryService.class.getName()) // 指定接口
+                    .setProtocol("bolt") // 指定协议
+                    .setDirectUrl("bolt://" + primaryip + ":12200") // 指定直连地址
+                    .setTimeout(2000)
+                    .setRepeatedReferLimit(30);//allow duplicate for tests
+            // 生成代理类
+            primaryService = consumerConfig.refer();
+        } catch (Exception e) {
+            e.printStackTrace();
+            LOG.error(String.valueOf(e));
         }
-        ConsumerConfig<PrimaryService> consumerConfig = new ConsumerConfig<PrimaryService>()
-                .setInterfaceId(PrimaryService.class.getName()) // 指定接口
-                .setProtocol("bolt") // 指定协议
-                .setDirectUrl("bolt://" + primaryip + ":12200") // 指定直连地址
-                .setTimeout(2000)
-                .setRepeatedReferLimit(30);//allow duplicate for tests
-        // 生成代理类
-        PrimaryService primaryService = consumerConfig.refer();
+        assert primaryService != null;
         return primaryService;
     }
 
