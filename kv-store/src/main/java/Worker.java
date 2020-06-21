@@ -36,6 +36,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     // stores workerAddr -->ConsumerConfig mapping
 
     volatile private boolean isPrimary;
+    volatile private Set<String> StandBySet = new HashSet<String>();
     Watcher workerExistsWatcher = new Watcher() {
         public void process(WatchedEvent e) {
             if (e.getType() == Event.EventType.NodeDeleted) {
@@ -69,7 +70,6 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             }
         }
     };
-    volatile private Set<String> StandBySet = new HashSet<String>();
     volatile private String KeyStart = null;
 
     Worker(String zookeeperaddress, String primaryNodeIP, String primaryNodePort, String realIP, String realPort) throws UnknownHostException {
@@ -170,7 +170,22 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 Stat stat = new Stat();
                 byte[] data = zk.getData("/workers/" + primaryNodeAddr, false, stat);
                 isPrimary = new String(data).equals(realAddress);
-                LOG.info(realAddress + "is the primary Data Node");
+                if (isPrimary) {
+                    LOG.info(realAddress + "is already the primary Data Node");
+                } else {
+                    //register to the leader node
+                    try {
+                        String res = GetWorkerServiceByWorkerADDR(new String(data)).RegisterAsStandBy(this.realAddress);
+                        if (!res.equals("OK")) {
+                            LOG.error(" RegisterAsStandBy FAIL");
+                        } else {
+                            LOG.info("RegisterAsStandBy OK");
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        LOG.error(String.valueOf(e));
+                    }
+                }
                 return true;
             } catch (KeeperException.NoNodeException e) {
                 LOG.info("checkPrimaryDataNode :NoNodeException");
@@ -211,7 +226,11 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     public String RegisterAsStandBy(String StandByAddr) {
         // add to standbylist
         synchronized (StandBySet) {
-            StandBySet.add(StandByAddr);
+            if (this.isPrimary)
+                StandBySet.add(StandByAddr);
+            else {
+                return "ERR";
+            }
         }
         return "OK";
     }
@@ -480,6 +499,9 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 zk.create("/workers/" + primaryNodeAddr, realAddress.getBytes(), OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
                 // create master znode should use CreateMode.EPHEMERAL
                 // so the znode would be deleted when the connection is lost
+
+                // reach here means create success, which means this is the leader node
+                this.StandBySet.clear();
                 isPrimary = true;
                 LOG.info(realAddress + " is PrimaryDataNode");
                 break;
