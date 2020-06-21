@@ -67,13 +67,13 @@ public class Config {
         t.start();
     }
 
-    static public void StartStandbyWorker(Integer workerID) {
+    static public void StartStandbyWorker(Integer workerID, Integer standByID) {
         Thread t = new Thread(
                 () ->
                 {
                     try {
                         String workerargs[] = {Config.zookeeperHost, PrivateData.ip, "1230" + workerID.toString(),
-                                PrivateData.ip, "1240" + workerID.toString()
+                                PrivateData.ip, "124" + workerID.toString() + standByID.toString()
                         };
                         Worker.main(workerargs);
                     } catch (Exception e) {

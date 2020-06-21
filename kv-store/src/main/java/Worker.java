@@ -69,7 +69,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             }
         }
     };
-    volatile private Set<String> StandByList = new HashSet<String>();
+    volatile private Set<String> StandBySet = new HashSet<String>();
     volatile private String KeyStart = null;
 
     Worker(String zookeeperaddress, String primaryNodeIP, String primaryNodePort, String realIP, String realPort) throws UnknownHostException {
@@ -92,26 +92,21 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         w.startZK();
         w.registerRPCServices();// make sure the RPC can work, then register to zookeeper
 
-        // make sure the primaryDataNode get to be the leader
+        //保证Primary worker先抢占到领导权
         if (w.primaryNodeAddr.equals(w.realAddress))
             w.runForPrimaryDataNode();
 
         if (w.isPrimary) {
             {
                 //  make sure there is at least 2 standby node
-//                while(true) {
-//                    if (w.StandByList.size() >= 2) {
-//                        break;
-//                    } else {
-//                        Thread.sleep(100);
-//                    }
-//                }
             }
         } else {
             try {
                 String res = w.GetWorkerServiceByWorkerADDR(w.primaryNodeAddr).RegisterAsStandBy(w.realAddress);
                 if (!res.equals("OK")) {
                     LOG.error(" RegisterAsStandBy FAIL");
+                } else {
+                    LOG.info("RegisterAsStandBy OK");
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -209,8 +204,8 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     @Override
     public String RegisterAsStandBy(String StandByAddr) {
         // add to standbylist
-        synchronized (StandByList) {
-            StandByList.add(StandByAddr);
+        synchronized (StandBySet) {
+            StandBySet.add(StandByAddr);
         }
         return "OK";
     }
@@ -289,6 +284,10 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
     @Override
     public String SetKeyRange(String keystart, String keyend, boolean dataTranfer) {
+        if (this.StandBySet.size() < 2) {
+            LOG.warn("StandByNotReady");
+            return "ERR";
+        }
         if (this.KeyStart == null && this.KeyEnd == null) {
             if (!dataTranfer) {
                 this.KeyStart = keystart;
@@ -456,7 +455,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 // create master znode should use CreateMode.EPHEMERAL
                 // so the znode would be deleted when the connection is lost
                 isPrimary = true;
-                LOG.info(realAddress + "is PrimaryDataNode");
+                LOG.info(realAddress + " is PrimaryDataNode");
                 break;
             } catch (KeeperException.NoNodeException e) {
                 isPrimary = false;
