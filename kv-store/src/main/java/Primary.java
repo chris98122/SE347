@@ -140,8 +140,10 @@ public class Primary implements Watcher, PrimaryService {
             LOG.info("serverId:" + serverId);
             m.boostrap();
 
-            while (m.workerState.size() <= 2)// block until initialize at 2 workers
+            while (m.workerState.size() < 2)// block until initialize at 2 workers
+            {
                 m.InitialhashWorkers();
+            }
 
             m.getWorkers();//register the "/worker"" Watcher
 
