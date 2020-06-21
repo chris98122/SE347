@@ -519,6 +519,10 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     }
 
     void runForPrimaryDataNode() {
+        if (!this.primaryNodeAddr.equals(this.realAddress) && this.KeyStart == null) {
+            LOG.info("should let primaryNode get leadership in the initialization stage");
+            return;
+        }
         while (true) {
             try {
                 LOG.info(realAddress + " is running for PrimaryDataNode");
