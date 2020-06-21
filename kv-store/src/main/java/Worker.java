@@ -114,8 +114,9 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             }
         }
 
+        //保证Primary worker的StandBy node都注册好了之后再等待SetKeyRange
         while (w.StandBySet.size() < 2)
-            TimeUnit.SECONDS.sleep(30);
+            TimeUnit.SECONDS.sleep(10);
 
         if (w.isPrimary) {
             // if the worker is a new one, primary should call rpc SetKeyRange(startKey,endKey,true)
