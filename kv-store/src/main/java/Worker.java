@@ -367,11 +367,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             {
                 // 主节点通过异步的方式将新的数据同步到对应的从节点，
                 // 不过在某些情况下会造成写丢失
-                CopyToStandBy copyToStandBy = new CopyToStandBy();
-                copyToStandBy.key = key;
-                copyToStandBy.value = value;
-                copyToStandBy.execution = EXECUTION.PUT;
-                copyToStandBy.standbySet = this.StandBySet;
+                CopyToStandBy copyToStandBy = new CopyToStandBy(key, value, StandBySet, EXECUTION.PUT);
                 copyToStandBy.setName("CopyToStandBy put" + key);
                 copyToStandBy.start();
             }
@@ -414,10 +410,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             {
                 // 主节点通过异步的方式将新的数据同步到对应的从节点，
                 // 不过在某些情况下会造成写丢失
-                CopyToStandBy copyToStandBy = new CopyToStandBy();
-                copyToStandBy.key = key;
-                copyToStandBy.execution = EXECUTION.DELETE;
-                copyToStandBy.standbySet = this.StandBySet;
+                CopyToStandBy copyToStandBy = new CopyToStandBy(key, null, StandBySet, EXECUTION.DELETE);
                 copyToStandBy.setName("CopyToStandBy delete" + key);
                 copyToStandBy.start();
             }
@@ -531,13 +524,23 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         public String key = null;
         public String value = null;
         public Set<String> standbySet = null;
-        EXECUTION execution = null;
+        public EXECUTION execution = null;
+
+        CopyToStandBy(String key, String value, Set<String> standbySet, EXECUTION execution) {
+            super();
+            this.key = key;
+            this.value = value;
+            this.standbySet = standbySet;
+            this.execution = execution;
+
+        }
 
         public void run() {
             LOG.info("copyToStandBy RUNNING");
             for (String standbyAddr : this.standbySet) {
                 LOG.info("ready to send " + standbyAddr);
                 try {
+                    assert execution != null;
                     if (execution.equals(EXECUTION.PUT)) {
                         String res = GetWorkerServiceByWorkerADDR(standbyAddr).PUT(key, value);
                         LOG.info(standbyAddr + " " + res);
@@ -547,7 +550,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                         LOG.info(standbyAddr + " " + res);
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    LOG.error(String.valueOf(e.getStackTrace()));
                     LOG.error(String.valueOf(e));
                 }
             }
