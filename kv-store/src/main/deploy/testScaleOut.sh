@@ -12,7 +12,7 @@ mkdir ScaleOutTest
 cd ScaleOutTest
 sudo rm -rf log4j2.log
 
-sleep 1m
+sleep 10s
 java -cp  ../kv-store/target/kv-store-1.0-SNAPSHOT.jar doPUTandGET & #起了PRIMARY并进行PUT GET操作
 
 cd ..

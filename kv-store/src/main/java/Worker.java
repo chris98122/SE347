@@ -483,8 +483,8 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 isPrimary = false;
                 break;
             } catch (KeeperException.NodeExistsException e) {
-                LOG.info(realAddress + " running NodeExists");
-                isPrimary = false;
+                LOG.info( "NodeExistsException,check if it's self");
+                checkPrimaryDataNode();
                 break;
             } catch (KeeperException.ConnectionLossException ignored) {
             } catch (KeeperException | InterruptedException e) {

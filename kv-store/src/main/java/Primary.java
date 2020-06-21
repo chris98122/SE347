@@ -314,6 +314,7 @@ public class Primary implements Watcher, PrimaryService {
     }
 
     public void getWorkers() throws KeeperException, InterruptedException {
+        LOG.info("register workersChangeWatcher");
         zk.getChildren("/workers", workersChangeWatcher, workerGetChildrenCallback, null);
         // register the workersChangeWatcher
     }
@@ -587,6 +588,7 @@ public class Primary implements Watcher, PrimaryService {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
+                // 事实上如果primary 繁忙，scaleout 线程几乎不会被调度到
                 ScaleOut scaleOut = new ScaleOut();
                 scaleOut.setName("scaleOut" + ScaleOutCounter.addAndGet(1));
                 scaleOut.start();

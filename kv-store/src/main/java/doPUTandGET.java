@@ -27,7 +27,7 @@ public class doPUTandGET {
             int storedatatcounter = 1;
 
             while (true) {
-                TimeUnit.MINUTES.sleep(1);
+                TimeUnit.MINUTES.sleep(10);
                 if (storedatatcounter < 10) {
                     Config.StoreLargeData(storedatatcounter * 100, 100);
                     storedatatcounter++;
