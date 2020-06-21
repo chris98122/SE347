@@ -11,6 +11,8 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -550,7 +552,12 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                         LOG.info(standbyAddr + " " + res);
                     }
                 } catch (Exception e) {
-                    LOG.error(e.getStackTrace().toString());
+
+                    StringWriter sw = new StringWriter();
+                    PrintWriter pw = new PrintWriter(sw);
+                    e.printStackTrace(pw);
+                    String sStackTrace = sw.toString(); // stack trace as a string
+                    LOG.error(sStackTrace);
                     LOG.error(String.valueOf(e));
                 }
             }
