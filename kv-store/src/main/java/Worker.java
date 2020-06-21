@@ -40,6 +40,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     volatile private boolean isPrimary;
     Watcher workerExistsWatcher = new Watcher() {
         public void process(WatchedEvent e) {
+            LOG.info(e.getPath());
             if (e.getType() == Event.EventType.NodeDeleted) {
                 assert ("/workers/" + primaryNodeAddr).equals(e.getPath());
                 //如果是自己所属的worker断开连接,则尝试自己成为PrimaryDtaNode
@@ -117,8 +118,10 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         }
 
         //保证Primary worker的StandBy node都注册好了之后再等待SetKeyRange
-        while (w.StandBySet.size() < 2)
-            TimeUnit.SECONDS.sleep(10);
+        if (w.isPrimary) {
+            while (w.StandBySet.size() < 2)
+                TimeUnit.SECONDS.sleep(10);
+        }
 
         if (w.isPrimary) {
             // if the worker is a new one, primary should call rpc SetKeyRange(startKey,endKey,true)
