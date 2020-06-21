@@ -126,11 +126,9 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             while (w.KeyStart == null) {
                 LOG.warn("the KeyRange is not initialized,retry");
                 w.zk.close();
-                try{
-                w.startZK();
-                }
-                catch (Exception e)
-                {
+                try {
+                    w.startZK();
+                } catch (Exception e) {
                     e.printStackTrace();
                     LOG.error(String.valueOf(e));
                 }
