@@ -11,7 +11,7 @@ sleep 1m
 mkdir worker1-primary
 mkdir worker2-primary
 mkdir worker1-standyby1
-mkdir worker2-standyby2
+mkdir worker1-standyby2
 mkdir worker2-standyby1
 mkdir worker2-standyby2
 
