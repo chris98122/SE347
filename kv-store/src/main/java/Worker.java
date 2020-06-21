@@ -126,10 +126,16 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             while (w.KeyStart == null) {
                 LOG.warn("the KeyRange is not initialized,retry");
                 w.zk.close();
-                TimeUnit.SECONDS.sleep(5);
+                try{
                 w.startZK();
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                    LOG.error(String.valueOf(e));
+                }
                 w.runForPrimaryDataNode();
-                TimeUnit.SECONDS.sleep(30);
+                TimeUnit.MINUTES.sleep(2);
             }
         }
         LOG.info("register worker watcher");
@@ -483,7 +489,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 isPrimary = false;
                 break;
             } catch (KeeperException.NodeExistsException e) {
-                LOG.info( "NodeExistsException,check if it's self");
+                LOG.info("NodeExistsException,check if it's self");
                 checkPrimaryDataNode();
                 break;
             } catch (KeeperException.ConnectionLossException ignored) {
