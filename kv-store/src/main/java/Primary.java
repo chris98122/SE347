@@ -181,17 +181,16 @@ public class Primary implements Watcher, PrimaryService {
                 }
 
                 lock.writeLock().lock();
-                //LOG.info(" get lock ");
+                LOG.info(" get lock of " + key);
                 String res = workerService.PUT(key, value);
                 if (!lock.hasQueuedThreads()) {
                     lock.writeLock().unlock();
+                    LOG.info(" keyRWLockMap.remove(key) ");
                     keyRWLockMap.remove(key);
-                    //LOG.info(" keyRWLockMap.remove(key) ");
                 } else {
-                    //LOG.info("hasQueuedThreads");
+                    LOG.info("hasQueuedThreads");
                     lock.writeLock().unlock();
                 }
-                LOG.info("PUT " + key + ":" + value + " TO " + WorkerAddr + "FINISHED");
                 return res;
             }
         } catch (Exception e) {
@@ -253,15 +252,16 @@ public class Primary implements Watcher, PrimaryService {
                     keyRWLockMap.put(key, lock);
                 }
                 lock.writeLock().lock();
+                LOG.info(" get lock of " + key);
                 String res = workerService.DELETE(key);
                 if (!lock.hasQueuedThreads()) {
                     lock.writeLock().unlock();
+                    LOG.info(" keyRWLockMap.remove(key) ");
                     keyRWLockMap.remove(key);
                 } else {
                     LOG.info("hasQueuedThreads");
                     lock.writeLock().unlock();
                 }
-                LOG.info("delete " + key + " TO " + WorkerAddr + "finished");
                 return res;
             }
         } catch (Exception e) {
