@@ -417,9 +417,10 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     copyToStandBy.setName("CopyToStandBy put" + key);
                     copyToStandBy.setPriority(Thread.MAX_PRIORITY);
                     copyToStandBy.start();
+                    copyToStandBy.run();
                     while (!lock.isWriteLocked()) {
                         //保证copyToStandBy拿到锁
-                        LOG.info("CopyToStandBy getting lock" + key);
+                        // LOG.info("CopyToStandBy getting lock" + key);
                     }
                     LOG.info("CopyToStandBy GET LOCK OF" + key);
                 }
