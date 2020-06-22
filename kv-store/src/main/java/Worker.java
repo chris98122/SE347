@@ -415,7 +415,6 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
                     CopyToStandBy copyToStandBy = new CopyToStandBy(key, value, StandBySet, EXECUTION.PUT, lock);
                     copyToStandBy.setName("CopyToStandBy put" + key);
-                    copyToStandBy.setPriority(Thread.MAX_PRIORITY);
                     copyToStandBy.start();
                     copyToStandBy.run();
                     while (!lock.isWriteLocked()) {
@@ -478,10 +477,10 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     ReentrantReadWriteLock lock = GetRWlock(key);
                     // 只有拿到锁才能启动线程
 
-                    CopyToStandBy copyToStandBy = new CopyToStandBy(key, null, StandBySet, EXECUTION.PUT, lock);
-                    copyToStandBy.setName("CopyToStandBy put" + key);
-                    copyToStandBy.setPriority(Thread.MAX_PRIORITY);
+                    CopyToStandBy copyToStandBy = new CopyToStandBy(key, null, StandBySet, EXECUTION.DELETE, lock);
+                    copyToStandBy.setName("CopyToStandBy delete" + key);
                     copyToStandBy.start();
+                    copyToStandBy.run();
                     while (!lock.isWriteLocked()) {
                         //保证copyToStandBy拿到锁
                     }

@@ -185,14 +185,20 @@ public class Primary implements Watcher, PrimaryService {
                 lock.writeLock().lock();
                 LOG.info(" get lock of " + key);
                 String res = null;
-                try {
-                    res = workerService.PUT(key, value);
-                } catch (SofaTimeOutException e) {
-                    LOG.error(String.valueOf(e));
-                } catch (SofaRouteException e) {
-                    LOG.error(String.valueOf(e));
-                } catch (SofaRpcException e) {
-                    LOG.error(String.valueOf(e));
+                int retrycounter = 0;
+                while (retrycounter < 2) {
+                    try {
+                        res = workerService.PUT(key, value);
+                        break;
+                    } catch (SofaTimeOutException e) {
+                        LOG.error(String.valueOf(e));
+                    } catch (SofaRouteException e) {
+                        LOG.error(String.valueOf(e));
+                    } catch (SofaRpcException e) {
+                        LOG.error(String.valueOf(e));
+                    }
+                    retrycounter++;
+                    res = "ERR";
                 }
                 if (!lock.hasQueuedThreads()) {
                     lock.writeLock().unlock();
@@ -229,14 +235,20 @@ public class Primary implements Watcher, PrimaryService {
                 }
                 lock.readLock().lock();
                 String res = null;
-                try {
-                    res = workerService.GET(key);
-                } catch (SofaTimeOutException e) {
-                    LOG.error(String.valueOf(e));
-                } catch (SofaRouteException e) {
-                    LOG.error(String.valueOf(e));
-                } catch (SofaRpcException e) {
-                    LOG.error(String.valueOf(e));
+                int retrycounter = 0;
+                while (retrycounter < 2) {
+                    try {
+                        res = workerService.GET(key);
+                        break;
+                    } catch (SofaTimeOutException e) {
+                        LOG.error(String.valueOf(e));
+                    } catch (SofaRouteException e) {
+                        LOG.error(String.valueOf(e));
+                    } catch (SofaRpcException e) {
+                        LOG.error(String.valueOf(e));
+                    }
+                    retrycounter++;
+                    res = "ERR";
                 }
                 if (!lock.hasQueuedThreads()) {
                     lock.readLock().unlock();
@@ -274,14 +286,20 @@ public class Primary implements Watcher, PrimaryService {
                 lock.writeLock().lock();
                 LOG.info(" get lock of " + key);
                 String res = null;
-                try {
-                    res = workerService.GET(key);
-                } catch (SofaTimeOutException e) {
-                    LOG.error(String.valueOf(e));
-                } catch (SofaRouteException e) {
-                    LOG.error(String.valueOf(e));
-                } catch (SofaRpcException e) {
-                    LOG.error(String.valueOf(e));
+                int retrycounter = 0;
+                while (retrycounter < 2) {
+                    try {
+                        res = workerService.DELETE(key);
+                        break;
+                    } catch (SofaTimeOutException e) {
+                        LOG.error(String.valueOf(e));
+                    } catch (SofaRouteException e) {
+                        LOG.error(String.valueOf(e));
+                    } catch (SofaRpcException e) {
+                        LOG.error(String.valueOf(e));
+                    }
+                    retrycounter++;
+                    res = "ERR";
                 }
                 if (!lock.hasQueuedThreads()) {
                     lock.writeLock().unlock();
