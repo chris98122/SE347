@@ -116,6 +116,7 @@ public class Primary implements Watcher, PrimaryService {
 
                     ProcessWorkerChange processWorkerChange = new ProcessWorkerChange();
                     processWorkerChange.setName("processWorkerChange" + ProcessWorkerChangeCounter.addAndGet(1));
+                    processWorkerChange.setPriority(Thread.MAX_PRIORITY);
                     processWorkerChange.start();
                 } catch (KeeperException | InterruptedException keeperException) {
                     keeperException.printStackTrace();
@@ -604,6 +605,9 @@ public class Primary implements Watcher, PrimaryService {
                 // 事实上如果primary 繁忙，scaleout 线程几乎不会被调度到
                 ScaleOut scaleOut = new ScaleOut();
                 scaleOut.setName("scaleOut" + ScaleOutCounter.addAndGet(1));
+                scaleOut.setPriority(Thread.MAX_PRIORITY);//例如processworker程启动scaleout线程，则scaleout的优先级应该也是10
+                // 线程的优先级只是调度器的一个提示。
+                // Thread类的setPriority()方法为线程设置了新的优先级。
                 scaleOut.start();
             }
             ProcessWorkerChangeLatch.countDown();

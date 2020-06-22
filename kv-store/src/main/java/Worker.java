@@ -22,7 +22,6 @@ import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
 
 public class Worker implements Watcher, WorkerService, DataTransferService {
     private static final Logger LOG = LoggerFactory.getLogger(Worker.class);
-    private static ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     // primary data node metadata
     private final String primaryNodeIP;
     private final String primaryNodePort;
@@ -33,6 +32,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     private final String realPort;
     private final String zookeeperaddress;
     ZooKeeper zk;
+    volatile HashMap<String, ReentrantReadWriteLock> keyRWLockMap = new HashMap<String, ReentrantReadWriteLock>();
     volatile private Set<String> StandBySet = new HashSet<String>();
     volatile private String KeyStart = null;
     private String KeyEnd = null;
@@ -408,11 +408,23 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 // 主节点通过异步的方式将新的数据同步到对应的从节点，
                 // 不过在某些情况下会造成写丢失
                 if (isPrimary) {
+                    // concurrency control
+                    // make writes to the same key sequential
+                    ReentrantReadWriteLock lock;
+                    if (keyRWLockMap.containsKey(key)) {
+                        lock = keyRWLockMap.get(key);
+                    } else {
+                        lock = new ReentrantReadWriteLock();
+                        keyRWLockMap.put(key, lock);
+                    }
+                    lock.writeLock().lock();
+                    // 只有拿到锁才能启动线程
                     CopyToStandBy copyToStandBy = new CopyToStandBy(key, value, StandBySet, EXECUTION.PUT);
                     copyToStandBy.setName("CopyToStandBy put" + key);
                     copyToStandBy.start();
                 }
             }
+
             return "OK";
         } catch (RingoDBException | MWException e) {
             e.printStackTrace();
@@ -452,6 +464,17 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 // 主节点通过异步的方式将新的数据同步到对应的从节点，
                 // 不过在某些情况下会造成写丢失
                 if (isPrimary) {
+                    // concurrency control
+                    // make writes to the same key sequential
+                    ReentrantReadWriteLock lock;
+                    if (keyRWLockMap.containsKey(key)) {
+                        lock = keyRWLockMap.get(key);
+                    } else {
+                        lock = new ReentrantReadWriteLock();
+                        keyRWLockMap.put(key, lock);
+                    }
+                    lock.writeLock().lock();
+
                     CopyToStandBy copyToStandBy = new CopyToStandBy(key, null, StandBySet, EXECUTION.DELETE);
                     copyToStandBy.setName("CopyToStandBy delete" + key);
                     copyToStandBy.start();
@@ -579,7 +602,6 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             this.value = value;
             this.standbySet = standbySet;
             this.execution = execution;
-
         }
 
         public void run() {
@@ -597,13 +619,24 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                         LOG.info(standbyAddr + " " + res);
                     }
                 } catch (Exception e) {
-
                     StringWriter sw = new StringWriter();
                     PrintWriter pw = new PrintWriter(sw);
                     e.printStackTrace(pw);
                     String sStackTrace = sw.toString(); // stack trace as a string
                     LOG.error(sStackTrace);
                     LOG.error(String.valueOf(e));
+                }
+            }
+
+            {
+                // 不论成功失败都放锁，但是如果这个线程崩了那就再也放不了锁了那就凉了
+                ReentrantReadWriteLock lock = keyRWLockMap.get(key);
+                if (!lock.hasQueuedThreads()) {
+                    lock.writeLock().unlock();
+                    keyRWLockMap.remove(key);
+                } else {
+                    // LOG.info("hasQueuedThreads");
+                    lock.writeLock().unlock();
                 }
             }
         }
