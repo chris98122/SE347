@@ -6,7 +6,10 @@ import java.util.concurrent.TimeUnit;
 public class doPUTandGET {
     public static void main(String[] args) throws Exception, MWException {
         NormalPUTGETTest();
+        concurrencyTest();//worker fail during the period
+        TimeUnit.SECONDS.sleep(30);
         concurrencyTest();
+        TimeUnit.SECONDS.sleep(30);
     }
 
 
