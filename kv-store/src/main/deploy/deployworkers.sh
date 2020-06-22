@@ -1,3 +1,5 @@
+sh  ./kv-store/target/clear.sh
+sleep 15s
 mkdir worker1-primary
 mkdir worker2-primary
 mkdir worker1-standby1
