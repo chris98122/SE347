@@ -770,6 +770,7 @@ public class Primary implements Watcher, PrimaryService {
                                     LOG.info("wait for " + workerSenderAddr + " to notify datatransfer finish");
                                     try {
                                         DataTransfertLatch.await();
+                                        res = "OK";
                                     } catch (InterruptedException e) {
                                         e.printStackTrace();
                                         LOG.error(String.valueOf(e));
