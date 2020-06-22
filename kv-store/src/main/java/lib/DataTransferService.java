@@ -1,8 +1,8 @@
 package lib;
 
-import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 public interface DataTransferService {
-    String DoTransfer(TreeMap<String, String> data);
+    String DoTransfer(ConcurrentHashMap<String, String> data);
 
 }

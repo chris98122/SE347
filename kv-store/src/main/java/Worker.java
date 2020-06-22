@@ -19,7 +19,7 @@ import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -237,7 +237,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     }
 
     @Override
-    public String DoTransfer(TreeMap<String, String> data) {
+    public String DoTransfer(ConcurrentHashMap<String, String> data) {
         LOG.info("DoTransfer" + String.valueOf(data));
 
         try {
@@ -349,7 +349,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         LOG.info("ready ResetKeyEnd to " + Hash(NewKeyEnd));
         if (checkNeedDataTransfer(NewKeyEnd, oldKeyEnd)) {
             try {
-                TreeMap<String, String> data = RingoDB.INSTANCE.SplitTreeMap(NewKeyEnd, oldKeyEnd);
+                ConcurrentHashMap<String, String> data = RingoDB.INSTANCE.SplitMap(NewKeyEnd, oldKeyEnd);
                 this.KeyEnd = Hash(NewKeyEnd).toString();
 
                 Thread t = new Thread(
@@ -362,7 +362,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                                 try {
                                     notifyPrimaryDataTransferFinish();
                                     // use primaryNodeAddr, because Hash(primaryNodeAddr) == KeyStart
-                                    RingoDB.INSTANCE.TrunkTreeMap(this.primaryNodeAddr, NewKeyEnd);
+                                    RingoDB.INSTANCE.TrunkMap(this.primaryNodeAddr, NewKeyEnd);
                                 } catch (RingoDBException e) {
                                     e.printStackTrace();
                                 }
@@ -466,7 +466,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     // make writes to the same key sequential
 
                     CopyToStandBy copyToStandBy = new CopyToStandBy(key, value, StandBySet, EXECUTION.PUT, null);
-                    copyToStandBy.setName("CopyToStandBy put" + key);
+                    copyToStandBy.setName("CopyToStandBy put " + key);
                     copyToStandBy.start();
 //                    copyToStandBy.run();
 //                    while (!lock.isWriteLocked()) {
@@ -529,7 +529,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     // 只有拿到锁才能启动线程
 
                     CopyToStandBy copyToStandBy = new CopyToStandBy(key, null, StandBySet, EXECUTION.DELETE, null);
-                    copyToStandBy.setName("CopyToStandBy delete" + key);
+                    copyToStandBy.setName("CopyToStandBy delete " + key);
                     copyToStandBy.start();
 //                    copyToStandBy.run();
 //                    while (!lock.isWriteLocked()) {

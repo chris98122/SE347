@@ -5,9 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.util.Comparator;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 public enum RingoDB implements DB {
@@ -15,7 +13,7 @@ public enum RingoDB implements DB {
 
     private static final Logger LOG = LoggerFactory.getLogger(RingoDB.class);
     static Integer snapshot_version = 0;
-    TreeMap<String, String> map = new TreeMap<String, String>(new KeyComparator());
+    ConcurrentHashMap<String, String> map = new ConcurrentHashMap<String, String>();
     String SNAPSHOT_DIR = "./";
 
     public static Integer Hash(String string) {
@@ -45,7 +43,7 @@ public enum RingoDB implements DB {
         map.remove(key);
     }
 
-    public void setMap(TreeMap<String, String> data) throws RingoDBException {
+    public void setMap(ConcurrentHashMap<String, String> data) throws RingoDBException {
         try {
             assert map.isEmpty();
             //   SOFARPC序列化还是有问题
@@ -63,13 +61,17 @@ public enum RingoDB implements DB {
         int keystart = Hash(keyStart);
         int keyend = Hash(KeyEnd);
         if (keystart < keyend) {
-
-            return map.subMap(keyStart, KeyEnd).size() >= 1;
+            for (String key : map.keySet()) {
+                int newkey = Hash(key);
+                if (newkey >= keystart && newkey < keyend)
+                    return true;
+            }
         }
         if (keystart > keyend) {
             for (String key : map.keySet()) {
                 int newkey = Hash(key);
-                return newkey >= keystart || newkey < keyend;
+                if (newkey >= keystart || newkey < keyend)
+                    return true;
             }
         }
         //map.subMap(K startKey，K endKey)方法用于返回由参数中指定范围的键定义的映射的部分或部分
@@ -89,14 +91,14 @@ public enum RingoDB implements DB {
         return newkey >= keystart || newkey < keyend;
     }
 
-    public void TrunkTreeMap(String keyStart, String KeyEnd) throws RingoDBException {
+    public void TrunkMap(String keyStart, String KeyEnd) throws RingoDBException {
         //save keyStart->KeyEnd
         int keystart = Hash(keyStart);
         int keyend = Hash(KeyEnd);
         printDBContent();
-        LOG.info("TrunkTreeMap" + keystart + " " + keyend);
+        LOG.info("TrunkMap" + keystart + " " + keyend);
         if (keystart < keyend) {
-            TreeMap<String, String> newmap = new TreeMap<String, String>(new KeyComparator());
+            ConcurrentHashMap<String, String> newmap = new ConcurrentHashMap<String, String>();
             for (String key : map.keySet()) {
                 if (Hash(key) >= keystart && Hash(key) < keyend) {
                     newmap.put(key, map.get(key));
@@ -105,7 +107,7 @@ public enum RingoDB implements DB {
             map = newmap;
         }
         if (keystart > keyend) {
-            TreeMap newmap = new TreeMap<String, String>(new KeyComparator());
+            ConcurrentHashMap<String, String> newmap = new ConcurrentHashMap<String, String>();
             for (String key : map.keySet()) {
                 if (inRange(key, keyStart, KeyEnd)) {
                     newmap.put(key, map.get(key));
@@ -116,20 +118,21 @@ public enum RingoDB implements DB {
         printDBContent();
     }
 
-    public TreeMap<String, String> SplitTreeMap(String keyStart, String KeyEnd) throws RingoDBException {
-        TreeMap<String, String> res = null;
+    public ConcurrentHashMap<String, String> SplitMap(String keyStart, String KeyEnd) throws RingoDBException {
+        ConcurrentHashMap<String, String> res = null;
         int keystart = Hash(keyStart);
         int keyend = Hash(KeyEnd);
         if (keystart < keyend) {
-            LOG.info("SplitTreeMap");
-
-            SortedMap<String, String> s = map.subMap(keyStart, KeyEnd);
-            res = new TreeMap<>(new KeyComparator());
-            res.putAll(s);
-            return res;
+            LOG.info("SplitMap");
+            res = new ConcurrentHashMap<String, String>();
+            for (String key : map.keySet()) {
+                if (Hash(key) >= keystart && Hash(key) < keyend) {
+                    res.put(key, map.get(key));
+                }
+            }
         }
         if (keystart > keyend) {
-            res = new TreeMap<String, String>(new KeyComparator());
+            res = new ConcurrentHashMap<String, String>();
             for (String key : map.keySet()) {
                 if (inRange(key, keyStart, KeyEnd)) {
                     res.put(key, map.get(key));
@@ -222,6 +225,7 @@ public enum RingoDB implements DB {
 
                     // write something in the file
                     try {
+                        assert oout != null;
                         oout.writeObject(map);
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -239,7 +243,7 @@ public enum RingoDB implements DB {
         // create an ObjectInputStream for the file we created before
         ObjectInputStream ois = new ObjectInputStream(new FileInputStream(get_newest_snapshot_name()));
 
-        TreeMap<String, String> m1 = (TreeMap<String, String>) ois.readObject();
+        ConcurrentHashMap<String, String> m1 = (ConcurrentHashMap<String, String>) ois.readObject();
         if (map.isEmpty()) {
             map = m1;
         } else {
@@ -253,13 +257,5 @@ public enum RingoDB implements DB {
         }
     }
 
-    private class KeyComparator implements Comparator<String>, Serializable//比较器
-    {
-        @Override
-        public int compare(String o1, String o2) {
-            assert (o1 != null && o2 != null);
-            return new Integer(Hash(o1)).compareTo(Hash(o2));
-        }
-    }
     //to use RingoDB just call RingoDB.INSTANCE. flush()
 }
