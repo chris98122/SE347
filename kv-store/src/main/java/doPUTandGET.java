@@ -39,13 +39,10 @@ public class doPUTandGET {
             }
         } catch (Exception e) {
         }
-        
+
     }
 
     public static void concurrencyTest() throws InterruptedException {
-        Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
-        Thread.sleep(12000);
-
         //构造一堆在同一个KEY上put的client线程
         for (int i = 0; i < 30; i++) {
             ClientPUT c = new ClientPUT();
@@ -53,7 +50,7 @@ public class doPUTandGET {
             c.setName("client" + i);
             c.start();
         }
-        Thread.sleep(100000);
+        TimeUnit.SECONDS.sleep(30);
     }
 
     static class ClientPUT extends Thread {

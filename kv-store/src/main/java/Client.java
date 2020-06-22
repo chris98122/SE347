@@ -91,7 +91,7 @@ public class Client implements Watcher {
                     .setProtocol("bolt") // 指定协议
                     .setDirectUrl("bolt://" + primaryip + ":12200") // 指定直连地址
                     .setTimeout(2000)
-                    .setRepeatedReferLimit(30);//allow duplicate for tests
+                    .setRepeatedReferLimit(50);//allow duplicate for tests
             // 生成代理类
             primaryService = consumerConfig.refer();
         } catch (Exception e) {
