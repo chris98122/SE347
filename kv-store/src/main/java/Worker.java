@@ -419,7 +419,9 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     copyToStandBy.start();
                     while (!lock.isWriteLocked()) {
                         //保证copyToStandBy拿到锁
+                        LOG.info("CopyToStandBy getting lock" + key);
                     }
+                    LOG.info("CopyToStandBy GET LOCK OF" + key);
                 }
             }
             return "OK";
@@ -636,7 +638,14 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     LOG.error(String.valueOf(e));
                 }
             }
-            this.lock.writeLock().unlock();
+            if (!lock.hasQueuedThreads()) {
+                lock.writeLock().unlock();
+                LOG.info(" keyRWLockMap.remove(key) ");
+                keyRWLockMap.remove(key);
+            } else {
+                LOG.info("hasQueuedThreads");
+                lock.writeLock().unlock();
+            }
         }
     }
 }

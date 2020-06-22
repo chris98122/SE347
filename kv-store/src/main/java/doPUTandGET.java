@@ -1,6 +1,7 @@
 import lib.PrimaryService;
 import org.junit.Test;
 
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 public class doPUTandGET {
@@ -10,9 +11,8 @@ public class doPUTandGET {
                 {
                     try {
                         NormalPUTGETTest();
+                        DOSomePUTEverySecond();
                         TimeUnit.SECONDS.sleep(100);
-                        concurrencyTest();
-                        TimeUnit.SECONDS.sleep(30);
                         concurrencyTest();
                         TimeUnit.SECONDS.sleep(30);
                     } catch (Exception e) {
@@ -40,20 +40,35 @@ public class doPUTandGET {
             //持续在ScaleOut 过程中GET DATA
             Config.GETLargeData(0, 100);
 
-            int storedatatcounter = 1;
-
-//            while (true) {
-//                if (storedatatcounter < 20) {
-//                    Config.StoreLargeData(storedatatcounter * 10, 10);
-//                    storedatatcounter++;
-//                } else {
-//                    break;
-//                }
-//                TimeUnit.SECONDS.sleep(30);
-//            }
         } catch (Exception e) {
         }
 
+    }
+
+    public static void DOSomePUTEverySecond() throws InterruptedException {
+        Thread t = new Thread(
+                () ->
+                {
+                    Client client = new Client(Config.zookeeperHost);
+                    try {
+                        client.startZK();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    PrimaryService primaryService = client.PrimaryConnection();
+                    while (true) {
+                        try {
+                            TimeUnit.SECONDS.sleep(1);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        Random ran1 = new Random(10);
+                        Integer input = ran1.nextInt(Integer.MAX_VALUE);
+                        System.out.println(primaryService.PUT(input.toString(), input.toString()));
+                    }
+                });
+        t.setName("DOSomePUTeverysecond");
+        t.start();
     }
 
     public static void concurrencyTest() throws InterruptedException {
