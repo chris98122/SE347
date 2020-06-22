@@ -605,7 +605,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         }
 
         public void run() {
-            LOG.info("copyToStandBy RUNNING");
+            // LOG.info("copyToStandBy RUNNING");
             for (String standbyAddr : this.standbySet) {
                 LOG.info("ready to send " + standbyAddr);
                 try {
@@ -630,12 +630,13 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
             {
                 // 不论成功失败都放锁，但是如果这个线程崩了那就再也放不了锁了那就凉了
+                // 基本不会出现starving，因为同一个key的RPC是以sequrntiald的顺序由PRIMARY发给worker-primary的
                 ReentrantReadWriteLock lock = keyRWLockMap.get(key);
                 if (!lock.hasQueuedThreads()) {
                     lock.writeLock().unlock();
                     keyRWLockMap.remove(key);
                 } else {
-                    // LOG.info("hasQueuedThreads");
+                    LOG.info("hasQueuedThreads");
                     lock.writeLock().unlock();
                 }
             }
