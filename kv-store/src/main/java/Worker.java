@@ -337,7 +337,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         try {
             PrimaryService primaryService = PrimaryConnection();
             String res = primaryService.notifyTransferFinish(this.primaryNodeAddr, this.KeyEnd);
-            LOG.info("notifyTransferFinish" + res);
+            LOG.info("notifyTransferFinish " + res);
         } catch (Exception e) {
             LOG.error(String.valueOf(e));
             e.printStackTrace();

@@ -566,6 +566,10 @@ public class Primary implements Watcher, PrimaryService {
 //        synchronized (workerState) {
 //            workerState.put(WorkerSenderAddr, WORKERSTATE.READWRITE);
 //        }
+        LOG.info("GET notifyTransferFinish");
+        while (DataTransfertLatch.getCount() != 1) {
+            //spin
+        }
         DataTransfertLatch.countDown();
         return "OK";
     }
@@ -768,6 +772,7 @@ public class Primary implements Watcher, PrimaryService {
                                         DataTransfertLatch.await();
                                     } catch (InterruptedException e) {
                                         e.printStackTrace();
+                                        LOG.error(String.valueOf(e));
                                     }
                                 } else {
                                     LOG.warn("resetKeyRange FAIL");
