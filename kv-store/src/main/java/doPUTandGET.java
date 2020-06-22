@@ -10,7 +10,8 @@ public class doPUTandGET {
                 {
                     try {
                         NormalPUTGETTest();
-                        concurrencyTest();//worker fail during the period
+                        TimeUnit.SECONDS.sleep(30);
+                        concurrencyTest();
                         TimeUnit.SECONDS.sleep(30);
                         concurrencyTest();
                         TimeUnit.SECONDS.sleep(30);
@@ -57,13 +58,12 @@ public class doPUTandGET {
 
     public static void concurrencyTest() throws InterruptedException {
         //构造一堆在同一个KEY上put的client线程
-        for (int i = 0; i < 30; i++) {
+        for (int i = 0; i < 5; i++) {
             ClientPUT c = new ClientPUT();
             c.setDaemon(true);
             c.setName("client" + i);
             c.start();
         }
-        TimeUnit.SECONDS.sleep(30);
     }
 
     static class ClientPUT extends Thread {

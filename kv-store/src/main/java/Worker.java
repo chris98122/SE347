@@ -517,7 +517,8 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             ServerConfig serverConfig = (ServerConfig) new ServerConfig()
                     .setProtocol("bolt") // 设置一个协议，默认bolt
                     .setPort(Integer.parseInt(realPort))// 设置一个端口，即realPort
-                    .setDaemon(true);// 守护线程
+                    .setDaemon(true)// 守护线程
+                    .setMaxThreads(20);
 
             ProviderConfig<DataTransferService> providerConfig = new ProviderConfig<DataTransferService>()
                     .setInterfaceId(DataTransferService.class.getName()) // 指定接口

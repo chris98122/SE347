@@ -435,7 +435,7 @@ public class Primary implements Watcher, PrimaryService {
                     .setInterfaceId(WorkerService.class.getName()) // 指定接口
                     .setProtocol("bolt") // 指定协议
                     .setDirectUrl("bolt://" + workerip + ":" + workerport) // 指定直连地址
-                    .setTimeout(2000)
+                    .setTimeout(3000)//默认值3000
                     .setRepeatedReferLimit(30); //允许同一interface，同一uniqueId，不同server情况refer 30次，用于单机调试
 
             workerConsumerConfigHashMap.put(WorkerAddr, consumerConfig);
@@ -458,7 +458,8 @@ public class Primary implements Watcher, PrimaryService {
         ServerConfig serverConfig = new ServerConfig()
                 .setProtocol("bolt") // 设置一个协议，默认bolt
                 .setPort(12200) // 设置一个端口，默认12200
-                .setDaemon(false); // 非守护线程
+                .setDaemon(false)
+                .setMaxThreads(40); // 非守护线程
 
         ProviderConfig<PrimaryService> providerConfig = new ProviderConfig<PrimaryService>()
                 .setInterfaceId(PrimaryService.class.getName()) // 指定接口

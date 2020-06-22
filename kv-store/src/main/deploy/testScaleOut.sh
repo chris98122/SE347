@@ -1,13 +1,3 @@
-sudo netstat -tunlp| grep 12200 | awk  '{print $7}' |cut -d"/" -f1 |sudo xargs kill -9 #primary的端口
-sudo netstat -tunlp| grep 12301 | awk  '{print $7}' |cut -d"/" -f1 |sudo xargs kill -9 #worker3-primary的端口
-#sudo netstat -tunlp| grep 12302 | awk  '{print $7}' |cut -d"/" -f1 |sudo xargs kill -9 #worker4-primary的端口
-
-sudo netstat -tunlp| grep 12501 | awk  '{print $7}' |cut -d"/" -f1 |sudo xargs kill -9 #standyby1 worker3的端口
-sudo netstat -tunlp| grep 12502 | awk  '{print $7}' |cut -d"/" -f1 |sudo xargs kill -9 #standyby2 worker3的端口
-
-#sudo netstat -tunlp| grep 12503 | awk  '{print $7}' |cut -d"/" -f1 |sudo xargs kill -9 #standyby1 worker4的端口
-#sudo netstat -tunlp| grep 12504 | awk  '{print $7}' |cut -d"/" -f1 |sudo xargs kill -9 #standyby2 worker4的端口
-
 mkdir ScaleOutTest
 cd ScaleOutTest
 sudo rm -rf log4j2.log

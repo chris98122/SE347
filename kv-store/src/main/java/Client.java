@@ -90,7 +90,7 @@ public class Client implements Watcher {
                     .setInterfaceId(PrimaryService.class.getName()) // 指定接口
                     .setProtocol("bolt") // 指定协议
                     .setDirectUrl("bolt://" + primaryip + ":12200") // 指定直连地址
-                    .setTimeout(2000)
+                    .setTimeout(4000)//默认是3000
                     .setRepeatedReferLimit(500);//allow duplicate for tests
             // 生成代理类
             primaryService = consumerConfig.refer();
