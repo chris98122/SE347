@@ -412,11 +412,15 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 if (isPrimary) {
                     // concurrency control
                     // make writes to the same key sequential
-                    ReentrantReadWriteLock lock = GetRWlock(key);
-                    // 只有拿到锁才能启动线程
-                    CopyToStandBy copyToStandBy = new CopyToStandBy(key, value, StandBySet, EXECUTION.PUT);
-                    copyToStandBy.setName("CopyToStandBy put" + key);
-                    RunCopyToStandByAndUnlock(key, lock, copyToStandBy);
+                    Thread t = new Thread(() -> {
+                        ReentrantReadWriteLock lock = GetRWlock(key);
+                        // 只有拿到锁才能启动线程
+                        CopyToStandBy copyToStandBy = new CopyToStandBy(key, value, StandBySet, EXECUTION.PUT);
+                        copyToStandBy.setName("CopyToStandBy put" + key);
+                        RunCopyToStandByAndUnlock(key, lock, copyToStandBy);
+                    });
+                    t.setName("Manage CopyToStandBy put");
+                    t.start();
                 }
             }
 
@@ -488,12 +492,17 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 // 主节点通过异步的方式将新的数据同步到对应的从节点，
                 // 不过在某些情况下会造成写丢失
                 if (isPrimary) {
+
                     // concurrency control
                     // make writes to the same key sequential
-                    ReentrantReadWriteLock lock = GetRWlock(key);
-                    CopyToStandBy copyToStandBy = new CopyToStandBy(key, null, StandBySet, EXECUTION.DELETE);
-                    copyToStandBy.setName("CopyToStandBy delete" + key);
-                    RunCopyToStandByAndUnlock(key, lock, copyToStandBy);
+                    Thread t = new Thread(() -> {
+                        ReentrantReadWriteLock lock = GetRWlock(key);
+                        CopyToStandBy copyToStandBy = new CopyToStandBy(key, null, StandBySet, EXECUTION.DELETE);
+                        copyToStandBy.setName("CopyToStandBy delete" + key);
+                        RunCopyToStandByAndUnlock(key, lock, copyToStandBy);
+                    });
+                    t.setName("Manage CopyToStandBy delete");
+                    t.start();
                 }
             }
             return "OK";
