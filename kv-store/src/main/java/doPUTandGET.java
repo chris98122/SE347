@@ -10,7 +10,7 @@ public class doPUTandGET {
                 {
                     try {
                         NormalPUTGETTest();
-                        TimeUnit.SECONDS.sleep(30);
+                        TimeUnit.SECONDS.sleep(100);
                         concurrencyTest();
                         TimeUnit.SECONDS.sleep(30);
                         concurrencyTest();
