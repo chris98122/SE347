@@ -410,17 +410,15 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 if (isPrimary) {
                     // concurrency control
                     // make writes to the same key sequential
-                    ReentrantReadWriteLock lock = GetRWlock(key);
-                    // 只有拿到锁才能启动线程
 
-                    CopyToStandBy copyToStandBy = new CopyToStandBy(key, value, StandBySet, EXECUTION.PUT, lock);
+                    CopyToStandBy copyToStandBy = new CopyToStandBy(key, value, StandBySet, EXECUTION.PUT, null);
                     copyToStandBy.setName("CopyToStandBy put" + key);
                     copyToStandBy.start();
-                    copyToStandBy.run();
-                    while (!lock.isWriteLocked()) {
-                        //保证copyToStandBy拿到锁
-                        // LOG.info("CopyToStandBy getting lock" + key);
-                    }
+//                    copyToStandBy.run();
+//                    while (!lock.isWriteLocked()) {
+//                        //保证copyToStandBy拿到锁
+//                        // LOG.info("CopyToStandBy getting lock" + key);
+//                    }
                     LOG.info("CopyToStandBy GET LOCK OF" + key);
                 }
             }
@@ -474,16 +472,15 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 // 主节点通过异步的方式将新的数据同步到对应的从节点，
                 // 不过在某些情况下会造成写丢失
                 if (isPrimary) {
-                    ReentrantReadWriteLock lock = GetRWlock(key);
                     // 只有拿到锁才能启动线程
 
-                    CopyToStandBy copyToStandBy = new CopyToStandBy(key, null, StandBySet, EXECUTION.DELETE, lock);
+                    CopyToStandBy copyToStandBy = new CopyToStandBy(key, null, StandBySet, EXECUTION.DELETE, null);
                     copyToStandBy.setName("CopyToStandBy delete" + key);
                     copyToStandBy.start();
-                    copyToStandBy.run();
-                    while (!lock.isWriteLocked()) {
-                        //保证copyToStandBy拿到锁
-                    }
+//                    copyToStandBy.run();
+//                    while (!lock.isWriteLocked()) {
+//                        //保证copyToStandBy拿到锁
+//                    }
                 }
             }
             return "OK";
@@ -616,6 +613,8 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         public void run() {
             // LOG.info("copyToStandBy RUNNING");
             //先拿锁
+            ReentrantReadWriteLock lock = GetRWlock(key);
+            this.lock = lock;
             this.lock.writeLock().lock();
             for (String standbyAddr : this.standbySet) {
                 LOG.info("ready to send " + standbyAddr);

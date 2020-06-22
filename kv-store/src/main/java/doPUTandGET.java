@@ -56,13 +56,13 @@ public class doPUTandGET {
                         e.printStackTrace();
                     }
                     PrimaryService primaryService = client.PrimaryConnection();
+                    Random ran1 = new Random(10);
                     while (true) {
                         try {
                             TimeUnit.SECONDS.sleep(1);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
-                        Random ran1 = new Random(10);
                         Integer input = ran1.nextInt(Integer.MAX_VALUE);
                         System.out.println(primaryService.PUT(input.toString(), input.toString()));
                     }
