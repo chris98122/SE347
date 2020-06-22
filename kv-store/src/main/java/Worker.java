@@ -34,7 +34,6 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     private final String zookeeperaddress;
     ZooKeeper zk;
     volatile HashMap<String, ReentrantReadWriteLock> keyRWLockMap = new HashMap<String, ReentrantReadWriteLock>();
-    CountDownLatch CopyToStandByLatch = new CountDownLatch(0);
     volatile private Set<String> StandBySet = new HashSet<String>();
     volatile private String KeyStart = null;
     private String KeyEnd = null;
@@ -446,9 +445,8 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
     private void RunCopyToStandByAndUnlock(String key, ReentrantReadWriteLock lock, CopyToStandBy copyToStandBy) {
         copyToStandBy.start();
-
         try {
-            CopyToStandByLatch.await();//wait for Thread copyToStandBy ends
+            copyToStandBy.Latch.await();//wait for Thread copyToStandBy ends
             if (!lock.hasQueuedThreads()) {
                 lock.writeLock().unlock();
                 keyRWLockMap.remove(key);
@@ -621,6 +619,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         public String value = null;
         public Set<String> standbySet = null;
         public EXECUTION execution = null;
+        public CountDownLatch  Latch = new CountDownLatch(1);
 
         CopyToStandBy(String key, String value, Set<String> standbySet, EXECUTION execution) {
             super();
@@ -631,7 +630,6 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         }
 
         public void run() {
-            CopyToStandByLatch = new CountDownLatch(1);
             // LOG.info("copyToStandBy RUNNING");
             for (String standbyAddr : this.standbySet) {
                 LOG.info("ready to send " + standbyAddr);
@@ -654,7 +652,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     LOG.error(String.valueOf(e));
                 }
             }
-            CopyToStandByLatch.countDown();
+            Latch.countDown();
         }
     }
 }

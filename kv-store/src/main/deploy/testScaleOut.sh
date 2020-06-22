@@ -6,7 +6,7 @@ sleep 30s
 java -cp  ../kv-store/target/kv-store-1.0-SNAPSHOT.jar doPUTandGET & #起了PRIMARY并进行PUT GET操作
 
 cd ..
-sleep 10s
+sleep 20s
 
 mkdir worker3-primary
 mkdir worker4-primary
