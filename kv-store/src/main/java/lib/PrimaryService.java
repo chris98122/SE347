@@ -8,4 +8,6 @@ public interface PrimaryService {
     String GET(String key);
 
     String DELETE(String key);
+
+    String notifyTransferFinish(String WorkerSenderAddr, String newKeyEnd);
 }

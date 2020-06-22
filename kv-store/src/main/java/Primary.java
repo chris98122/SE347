@@ -51,6 +51,7 @@ public class Primary implements Watcher, PrimaryService {
 
     volatile List<String> workerlist = null;
     // 保存最新一次获取的workers
+    CountDownLatch DataTransfertLatch = new CountDownLatch(0);
 
     CountDownLatch ScaleOutLatch = new CountDownLatch(0);
 
@@ -74,27 +75,6 @@ public class Primary implements Watcher, PrimaryService {
                     break;
                 default:
                     LOG.error("something went wrong" + KeeperException.create(KeeperException.Code.get(rc), path));
-            }
-        }
-    };
-    AsyncCallback.ChildrenCallback workerGetChildrenCallback = new AsyncCallback.ChildrenCallback() {
-        @Override
-        public void processResult(int rc, String path, Object ctx, List<String> children) {
-            switch (KeeperException.Code.get(rc)) {
-                case CONNECTIONLOSS:
-                    try {
-                        LOG.info("retry get workers");
-                        getWorkers();
-                    } catch (KeeperException | InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    break;
-                case OK:
-                    LOG.info("Successfully got a list of workers:" + children.size() + "workers");
-                    LOG.info(String.valueOf(children));
-                    break;
-                default:
-                    LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
             }
         }
     };
@@ -123,6 +103,27 @@ public class Primary implements Watcher, PrimaryService {
                 } catch (KeeperException | InterruptedException keeperException) {
                     keeperException.printStackTrace();
                 }
+            }
+        }
+    };
+    AsyncCallback.ChildrenCallback workerGetChildrenCallback = new AsyncCallback.ChildrenCallback() {
+        @Override
+        public void processResult(int rc, String path, Object ctx, List<String> children) {
+            switch (KeeperException.Code.get(rc)) {
+                case CONNECTIONLOSS:
+                    try {
+                        LOG.info("retry get workers");
+                        getWorkers();
+                    } catch (KeeperException | InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    break;
+                case OK:
+                    LOG.info("Successfully got a list of workers:" + children.size() + "workers");
+                    LOG.info(String.valueOf(children));
+                    break;
+                default:
+                    LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
             }
         }
     };
@@ -357,12 +358,12 @@ public class Primary implements Watcher, PrimaryService {
                 workerState.put(WorkerSenderAddr, WORKERSTATE.READONLY);
             }
 
-            workerService.ResetKeyEnd(UnhashedOldKeyEnd, WorkerReceiverADRR, WorkerReceiverADRR);
-            workerkeymap.get(WorkerSenderAddr).set(1, newKeyEnd);
-            synchronized (workerState) {
-                workerState.put(WorkerSenderAddr, WORKERSTATE.READWRITE);
-            }
-            return "OK";
+            String res = workerService.ResetKeyEnd(UnhashedOldKeyEnd, WorkerReceiverADRR, WorkerReceiverADRR);
+//            workerkeymap.get(WorkerSenderAddr).set(1, newKeyEnd);
+//            synchronized (workerState) {
+//                workerState.put(WorkerSenderAddr, WORKERSTATE.READWRITE);
+//            }
+            return res;
         } catch (Exception e) {
             LOG.error(String.valueOf(e));
             e.printStackTrace();
@@ -559,10 +560,20 @@ public class Primary implements Watcher, PrimaryService {
         System.out.println(e);
     }
 
+    @Override
+    public String notifyTransferFinish(String WorkerSenderAddr, String newKeyEnd) {
+//        workerkeymap.get(WorkerSenderAddr).set(1, newKeyEnd);
+//        synchronized (workerState) {
+//            workerState.put(WorkerSenderAddr, WORKERSTATE.READWRITE);
+//        }
+        DataTransfertLatch.countDown();
+        return "OK";
+    }
+
+
     public enum WORKERSTATE {
         READWRITE, READONLY, FAIL
     }
-
 
     class ProcessWorkerChange extends Thread {
         public void run() {
@@ -664,7 +675,6 @@ public class Primary implements Watcher, PrimaryService {
         }
     }
 
-
     class ScaleOut extends Thread {
         /*
                         如果在注册后立马有新的workersChangeWatcher回调
@@ -731,20 +741,38 @@ public class Primary implements Watcher, PrimaryService {
                             LOG.info("resetKeyRange " + res);
                             // if there are more new workers , have to wait til the former one is all set up,
                             // 缺点是可能会a->b->c传两遍数据
-                            if (res.equals("OK")) {
-                                LOG.info("add " + workerReceiver + "  workerkeymap and workerState");
-                                ArrayList<String> a = new ArrayList<>();
-                                a.add(workerReceiverKeyStart);
-                                a.add(workerReceiverKeyEnd);
 
-                                workermap.put(Hash(workerReceiver), workerReceiver);
-                                workerkeymap.put(workerReceiver, a);
-                                synchronized (workerState) {
-                                    workerState.put(workerReceiver, WORKERSTATE.READWRITE);
+                            while (true) {
+                                if (res.equals("OK")) {
+                                    workerkeymap.get(workerSenderAddr).set(1, newKeyEnd);
+                                    synchronized (workerState) {
+                                        workerState.put(workerSenderAddr, WORKERSTATE.READWRITE);
+                                    }
+
+                                    LOG.info("add " + workerReceiver + "  workerkeymap and workerState");
+                                    ArrayList<String> a = new ArrayList<>();
+                                    a.add(workerReceiverKeyStart);
+                                    a.add(workerReceiverKeyEnd);
+
+                                    workermap.put(Hash(workerReceiver), workerReceiver);
+                                    workerkeymap.put(workerReceiver, a);
+                                    synchronized (workerState) {
+                                        workerState.put(workerReceiver, WORKERSTATE.READWRITE);
+                                    }
+                                    LOG.info("ScaleOut " + workerReceiver + " Finished");
+                                    break;
+                                } else if (res.equals("WAIT")) {
+                                    DataTransfertLatch = new CountDownLatch(1);
+                                    LOG.info("wait for " + workerSenderAddr + " to notify datatransfer finish");
+                                    try {
+                                        DataTransfertLatch.await();
+                                    } catch (InterruptedException e) {
+                                        e.printStackTrace();
+                                    }
+                                } else {
+                                    LOG.warn("resetKeyRange FAIL");
+                                    break;
                                 }
-                                LOG.info("ScaleOut " + workerReceiver + " Finished");
-                            } else {
-                                LOG.warn("resetKeyRange FAIL");
                             }
                         } else {
                             LOG.warn("workerReiverService.SetKeyRange FAIL");

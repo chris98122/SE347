@@ -3,7 +3,11 @@ import DB.RingoDBException;
 import com.alipay.sofa.rpc.config.ConsumerConfig;
 import com.alipay.sofa.rpc.config.ProviderConfig;
 import com.alipay.sofa.rpc.config.ServerConfig;
+import com.alipay.sofa.rpc.core.exception.SofaRouteException;
+import com.alipay.sofa.rpc.core.exception.SofaRpcException;
+import com.alipay.sofa.rpc.core.exception.SofaTimeOutException;
 import lib.DataTransferService;
+import lib.PrimaryService;
 import lib.WorkerService;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.zookeeper.*;
@@ -11,10 +15,11 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.net.UnknownHostException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -171,15 +176,18 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     }
 
     public void registerWorkerWatcher() {
-        try {
-            zk.exists("/workers/" + this.primaryNodeAddr, workerExistsWatcher);
-        } catch (KeeperException.NoNodeException e) {
-            LOG.info("NoNodeException in registerWorkerWatcher");
-        } catch (KeeperException.ConnectionLossException ignored) {
-            LOG.info("KeeperException.ConnectionLossException");
-        } catch (KeeperException | InterruptedException e) {
-            e.printStackTrace();
-            LOG.error(String.valueOf(e));
+        while (true) {
+            try {
+                zk.exists("/workers/" + this.primaryNodeAddr, workerExistsWatcher);
+                break;
+            } catch (KeeperException.NoNodeException e) {
+                LOG.info("NoNodeException in registerWorkerWatcher");
+            } catch (KeeperException.ConnectionLossException ignored) {
+                LOG.info("KeeperException.ConnectionLossException");
+            } catch (KeeperException | InterruptedException e) {
+                e.printStackTrace();
+                LOG.error(String.valueOf(e));
+            }
         }
     }
 
@@ -294,11 +302,46 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     .setTimeout(2000)
                     .setRepeatedReferLimit(30); //允许同一interface，同一uniqueId，不同server情况refer 30次，用于单机调试
 
-        } catch (Exception e) {
-            LOG.error(Arrays.toString(e.getStackTrace()));
+        } catch (SofaRpcException e) {
+            e.printStackTrace();
+            LOG.error(String.valueOf(e));
         }   // 生成代理类
         assert consumerConfig != null;
         return consumerConfig.refer();
+    }
+
+    public PrimaryService PrimaryConnection() {
+        PrimaryService primaryService = null;
+        try {
+            Stat stat = new Stat();
+            byte[] data = zk.getData("/primary", false, stat);
+            String primaryip = new String(data);
+
+            ConsumerConfig<PrimaryService> consumerConfig = new ConsumerConfig<PrimaryService>()
+                    .setInterfaceId(PrimaryService.class.getName()) // 指定接口
+                    .setProtocol("bolt") // 指定协议
+                    .setDirectUrl("bolt://" + primaryip + ":12200") // 指定直连地址
+                    .setTimeout(4000)//默认是3000
+                    .setRepeatedReferLimit(500);//allow duplicate for tests
+            // 生成代理类
+            primaryService = consumerConfig.refer();
+        } catch (Exception e) {
+            e.printStackTrace();
+            LOG.error(String.valueOf(e));
+        }
+        assert primaryService != null;
+        return primaryService;
+    }
+
+    public void notifyPrimaryDataTransferFinish() {
+        try {
+            PrimaryService primaryService = PrimaryConnection();
+            String res = primaryService.notifyTransferFinish(this.primaryNodeAddr, this.KeyEnd);
+            LOG.info("notifyTransferFinish" + res);
+        } catch (Exception e) {
+            LOG.error(String.valueOf(e));
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -307,16 +350,27 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         if (checkNeedDataTransfer(NewKeyEnd, oldKeyEnd)) {
             try {
                 TreeMap<String, String> data = RingoDB.INSTANCE.SplitTreeMap(NewKeyEnd, oldKeyEnd);
+                this.KeyEnd = Hash(NewKeyEnd).toString();
 
-                LOG.info("do datatransfer: " + data);
-                String res = GetDataTransferServiceByWorkerADDR(WorkerReceiverADRR).DoTransfer(data);
-                //delete db data
-                if (res.equals("OK")) {
-                    RingoDB.INSTANCE.TrunkTreeMap(this.primaryNodeAddr, NewKeyEnd);
-                    this.KeyEnd = Hash(NewKeyEnd).toString();
-                }
-                // use primaryNodeAddr, because Hash(primaryNodeAddr) == KeyStart
-                return res;
+                Thread t = new Thread(
+                        () ->
+                        {
+                            LOG.info("do datatransfer: " + data);
+                            String res = GetDataTransferServiceByWorkerADDR(WorkerReceiverADRR).DoTransfer(data);
+                            //delete db data
+                            if (res.equals("OK")) {
+                                try {
+                                    notifyPrimaryDataTransferFinish();
+                                    // use primaryNodeAddr, because Hash(primaryNodeAddr) == KeyStart
+                                    RingoDB.INSTANCE.TrunkTreeMap(this.primaryNodeAddr, NewKeyEnd);
+                                } catch (RingoDBException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        });
+                t.setName("datatransfer");
+                t.start();
+                return "WAIT";
             } catch (Exception e) {
                 e.printStackTrace();
                 LOG.error(String.valueOf(e));
@@ -618,23 +672,30 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             this.lock.writeLock().lock();
             for (String standbyAddr : this.standbySet) {
                 LOG.info("ready to send " + standbyAddr);
-                try {
-                    assert execution != null;
-                    if (execution.equals(EXECUTION.PUT)) {
-                        String res = GetWorkerServiceByWorkerADDR(standbyAddr).PUT(key, value);
-                        LOG.info(standbyAddr + " " + res);
+                String res = null;
+                int retrycounter = 0;
+                assert execution != null;
+                while (retrycounter < 2) {
+                    try {
+                        if (execution.equals(EXECUTION.PUT)) {
+                            res = GetWorkerServiceByWorkerADDR(standbyAddr).PUT(key, value);
+                            LOG.info(standbyAddr + " " + res);
+                        }
+                        if (execution.equals(EXECUTION.DELETE)) {
+                            res = GetWorkerServiceByWorkerADDR(standbyAddr).DELETE(key);
+                            LOG.info(standbyAddr + " " + res);
+                        }
+                        break;
+                    } catch (SofaTimeOutException e) {
+                        LOG.error(String.valueOf(e));
+                    } catch (SofaRouteException e) {
+                        LOG.error(String.valueOf(e));
+                    } catch (SofaRpcException e) {
+                        LOG.error(String.valueOf(e));
                     }
-                    if (execution.equals(EXECUTION.DELETE)) {
-                        String res = GetWorkerServiceByWorkerADDR(standbyAddr).DELETE(key);
-                        LOG.info(standbyAddr + " " + res);
-                    }
-                } catch (Exception e) {
-                    StringWriter sw = new StringWriter();
-                    PrintWriter pw = new PrintWriter(sw);
-                    e.printStackTrace(pw);
-                    String sStackTrace = sw.toString(); // stack trace as a string
-                    LOG.error(sStackTrace);
-                    LOG.error(String.valueOf(e));
+                    retrycounter++;
+                    res = "ERR";
+                    LOG.info(standbyAddr + " " + res);
                 }
             }
             if (!lock.hasQueuedThreads()) {
