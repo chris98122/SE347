@@ -15,6 +15,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.UnknownHostException;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -33,6 +34,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     private final String zookeeperaddress;
     ZooKeeper zk;
     volatile HashMap<String, ReentrantReadWriteLock> keyRWLockMap = new HashMap<String, ReentrantReadWriteLock>();
+    CountDownLatch CopyToStandByLatch = new CountDownLatch(0);
     volatile private Set<String> StandBySet = new HashSet<String>();
     volatile private String KeyStart = null;
     private String KeyEnd = null;
@@ -410,18 +412,11 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 if (isPrimary) {
                     // concurrency control
                     // make writes to the same key sequential
-                    ReentrantReadWriteLock lock;
-                    if (keyRWLockMap.containsKey(key)) {
-                        lock = keyRWLockMap.get(key);
-                    } else {
-                        lock = new ReentrantReadWriteLock();
-                        keyRWLockMap.put(key, lock);
-                    }
-                    lock.writeLock().lock();
+                    ReentrantReadWriteLock lock = GetRWlock(key);
                     // 只有拿到锁才能启动线程
                     CopyToStandBy copyToStandBy = new CopyToStandBy(key, value, StandBySet, EXECUTION.PUT);
                     copyToStandBy.setName("CopyToStandBy put" + key);
-                    copyToStandBy.start();
+                    RunCopyToStandByAndUnlock(key, lock, copyToStandBy);
                 }
             }
 
@@ -431,6 +426,35 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             LOG.error(String.valueOf(e));
         }
         return "ERR";
+    }
+
+    private ReentrantReadWriteLock GetRWlock(String key) {
+        ReentrantReadWriteLock lock;
+        if (keyRWLockMap.containsKey(key)) {
+            lock = keyRWLockMap.get(key);
+        } else {
+            lock = new ReentrantReadWriteLock();
+            keyRWLockMap.put(key, lock);
+        }
+        lock.writeLock().lock();
+        return lock;
+    }
+
+    private void RunCopyToStandByAndUnlock(String key, ReentrantReadWriteLock lock, CopyToStandBy copyToStandBy) {
+        copyToStandBy.start();
+
+        try {
+            CopyToStandByLatch.await();//wait for Thread copyToStandBy ends
+            if (!lock.hasQueuedThreads()) {
+                lock.writeLock().unlock();
+                keyRWLockMap.remove(key);
+            } else {
+                LOG.info("hasQueuedThreads");
+                lock.writeLock().unlock();
+            }
+        } catch (Exception e) {
+            LOG.error(String.valueOf(e));
+        }
     }
 
     @Override
@@ -466,18 +490,10 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 if (isPrimary) {
                     // concurrency control
                     // make writes to the same key sequential
-                    ReentrantReadWriteLock lock;
-                    if (keyRWLockMap.containsKey(key)) {
-                        lock = keyRWLockMap.get(key);
-                    } else {
-                        lock = new ReentrantReadWriteLock();
-                        keyRWLockMap.put(key, lock);
-                    }
-                    lock.writeLock().lock();
-
+                    ReentrantReadWriteLock lock = GetRWlock(key);
                     CopyToStandBy copyToStandBy = new CopyToStandBy(key, null, StandBySet, EXECUTION.DELETE);
                     copyToStandBy.setName("CopyToStandBy delete" + key);
-                    copyToStandBy.start();
+                    RunCopyToStandByAndUnlock(key, lock, copyToStandBy);
                 }
             }
             return "OK";
@@ -605,6 +621,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         }
 
         public void run() {
+            CopyToStandByLatch = new CountDownLatch(1);
             // LOG.info("copyToStandBy RUNNING");
             for (String standbyAddr : this.standbySet) {
                 LOG.info("ready to send " + standbyAddr);
@@ -627,20 +644,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     LOG.error(String.valueOf(e));
                 }
             }
-
-            {
-                // 不论成功失败都放锁，但是如果这个线程崩了那就再也放不了锁了那就凉了
-                // 基本不会出现starving，因为同一个key的RPC是以sequrntiald的顺序由PRIMARY发给worker-primary的
-                ReentrantReadWriteLock lock = keyRWLockMap.get(key);
-                if (!lock.hasQueuedThreads()) {
-                    lock.writeLock().unlock();
-                    keyRWLockMap.remove(key);
-                } else {
-                    LOG.info("hasQueuedThreads");
-                    lock.writeLock().unlock();
-                }
-            }
+            CopyToStandByLatch.countDown();
         }
     }
-
 }

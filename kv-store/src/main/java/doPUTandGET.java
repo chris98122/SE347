@@ -11,7 +11,7 @@ public class doPUTandGET {
                     try {
                         NormalPUTGETTest();
                         concurrencyTest();//worker fail during the period
-                        TimeUnit.SECONDS.sleep(10);
+                        TimeUnit.SECONDS.sleep(30);
                         concurrencyTest();
                         TimeUnit.SECONDS.sleep(30);
                     } catch (Exception e) {
