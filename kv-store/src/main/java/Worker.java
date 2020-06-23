@@ -178,7 +178,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         }
 
         // 不论是否是primary data node都进行snapshot
-        if (w.isRecover) {//means don't need recover or recover finish
+        if (!w.isRecover) { //means don't need recover or recover finish
             DoSnapshot();
         }
     }
@@ -213,6 +213,11 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         LOG.info("[DoRecover]RecoverFromSnapshot");
         try {
             RingoDB.INSTANCE.recover();
+        } catch (RingoDBException e) {
+            e.printStackTrace();
+            LOG.error("[DoRecover] RingoDBException");
+            LOG.error(String.valueOf(e));
+            LOG.error(e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
             LOG.error(String.valueOf(e));
@@ -226,6 +231,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         registerWorkerWatcher();
         LOG.info("[DoRecover]checkPrimaryDataNode");
         checkPrimaryDataNode();
+        this.isRecover = false;
     }
 
     public void registerWorkerWatcher() {

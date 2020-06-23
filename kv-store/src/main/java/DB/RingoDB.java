@@ -185,14 +185,17 @@ public enum RingoDB implements DB {
         return "snapshot-" + oldest_snapshot_version.toString();
     }
 
-    String get_newest_snapshot_name() {
+    String get_newest_snapshot_name() throws RingoDBException {
         LOG.info(" get_newest_snapshot_name()");
-        File dir = new File(SNAPSHOT_DIR); //要遍历的目录 
+        File dir = new File(SNAPSHOT_DIR); //要遍历的目录
         LOG.info(dir.getPath());
         Integer res = 0;
 
         if (dir.isDirectory()) {
             String[] children = dir.list();
+            if (children.length == 0) {
+                throw new RingoDBException.NoSnapshot();
+            }
             for (int i = 0; i < children.length; i++) {
                 //System.out.println(children[i]);
                 if (children[i].split("-").length > 1 && children[i].split("-")[0].equals("snapshot")) {
@@ -205,6 +208,9 @@ public enum RingoDB implements DB {
                     }
                 }
             }
+
+        } else {
+            throw new RingoDBException("wrong directory");
         }
         LOG.info("snapshot-" + res.toString());
         return "snapshot-" + res.toString();
@@ -244,10 +250,17 @@ public enum RingoDB implements DB {
         ).start();
     }
 
-    public void recover() throws IOException, ClassNotFoundException {
+    public void recover() throws IOException, ClassNotFoundException, RingoDBException {
         // create an ObjectInputStream for the file we created before
-        ObjectInputStream ois = new ObjectInputStream(new FileInputStream(get_newest_snapshot_name()));
+        String filename = null;
+        try {
+            filename = get_newest_snapshot_name();
+        } catch (RingoDBException.NoSnapshot e) {
+            LOG.warn("no snapshot for recovery");
+            return;
+        }
 
+        ObjectInputStream ois = new ObjectInputStream(new FileInputStream(filename));
         ConcurrentHashMap<String, String> m1 = (ConcurrentHashMap<String, String>) ois.readObject();
         if (map.isEmpty()) {
             map = m1;

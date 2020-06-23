@@ -1,8 +1,8 @@
-sleep 3m
+sleep 1m
 
 sudo netstat -tunlp| grep 12201 | awk  '{print $7}' |cut -d"/" -f1 |sudo xargs kill -9 #primary worker1的端口
 
-sleep 1m
+sleep 20s
 
 #recover primary worker1
 cd worker1-primary
