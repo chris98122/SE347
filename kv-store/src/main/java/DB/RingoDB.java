@@ -6,13 +6,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 public enum RingoDB implements DB {
     INSTANCE;
 
     private static final Logger LOG = LoggerFactory.getLogger(RingoDB.class);
-    static Integer snapshot_version = 0;
+    static AtomicInteger snapshot_version = new AtomicInteger(0);
     ConcurrentHashMap<String, String> map = new ConcurrentHashMap<String, String>();
     String SNAPSHOT_DIR = "./";
 
@@ -150,8 +151,7 @@ public enum RingoDB implements DB {
     }
 
     String generate_snapshot_name() {
-        snapshot_version++;
-        return "snapshot-" + snapshot_version.toString();
+        return "snapshot-" + snapshot_version.incrementAndGet();
     }
 
     public boolean delete_oldest_snapshot() {
@@ -187,8 +187,10 @@ public enum RingoDB implements DB {
 
     String get_newest_snapshot_name() {
         LOG.info(" get_newest_snapshot_name()");
-        File dir = new File(SNAPSHOT_DIR); //要遍历的目录
-        //System.out.println(dir);
+        File dir = new File(SNAPSHOT_DIR); //要遍历的目录 
+        LOG.info(dir.getPath());
+        Integer res = 0;
+
         if (dir.isDirectory()) {
             String[] children = dir.list();
             for (int i = 0; i < children.length; i++) {
@@ -196,16 +198,16 @@ public enum RingoDB implements DB {
                 if (children[i].split("-").length > 1 && children[i].split("-")[0].equals("snapshot")) {
                     try {
                         Integer version = Integer.valueOf(children[i].split("-")[1]);
-                        LOG.info("[RingoDB]"+version.toString());
-                        snapshot_version = Math.max(snapshot_version, version);
+                        LOG.info("[RingoDB]" + version.toString());
+                        res = Math.max(snapshot_version.get(), version);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
                 }
             }
         }
-        LOG.info("snapshot-" + snapshot_version.toString());
-        return "snapshot-" + snapshot_version.toString();
+        LOG.info("snapshot-" + res.toString());
+        return "snapshot-" + res.toString();
     }
 
     public void snapshot() throws IOException {
