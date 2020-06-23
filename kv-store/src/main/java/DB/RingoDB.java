@@ -24,20 +24,20 @@ public enum RingoDB implements DB {
     }
 
     @Override
-    public synchronized void Put(String key, String value) throws RingoDBException {
+    public void Put(String key, String value) throws RingoDBException {
         checkKey(key);
         map.put(key, value);
     }
 
     @Override
-    public synchronized String Get(String key) throws RingoDBException {
+    public String Get(String key) throws RingoDBException {
         checkKey(key);
         checkKeyExists(key);
         return map.get(key);
     }
 
     @Override
-    public synchronized void Delete(String key) throws RingoDBException {
+    public void Delete(String key) throws RingoDBException {
         checkKey(key);
         checkKeyExists(key);
         map.remove(key);
@@ -142,14 +142,14 @@ public enum RingoDB implements DB {
         return res;
     }
 
-    void checkKeyExists(String key) throws RingoDBException {
+    private void checkKeyExists(String key) throws RingoDBException {
         if (!map.containsKey(key)) {
             //key 不存在
             throw new RingoDBException("key not exists");
         }
     }
 
-    String generate_snapshot_name() {
+    private String generate_snapshot_name() {
         return "snapshot-" + snapshot_version.incrementAndGet();
     }
 
@@ -163,7 +163,7 @@ public enum RingoDB implements DB {
         }
     }
 
-    String SNAPSHOT_DIR() {
+    private String SNAPSHOT_DIR() {
         if (SNAPSHOT_DIR == null) {
             File directory = new File("");
             SNAPSHOT_DIR = directory.getAbsolutePath(); //获取绝对路径。
@@ -171,7 +171,7 @@ public enum RingoDB implements DB {
         return SNAPSHOT_DIR;
     }
 
-    String get_oldest_snapshot_name() {
+    private String get_oldest_snapshot_name() {
         File dir = new File(SNAPSHOT_DIR()); //要遍历的目录
         Integer oldest_snapshot_version = Integer.MAX_VALUE;
         //System.out.println(dir);
@@ -192,7 +192,7 @@ public enum RingoDB implements DB {
         return "snapshot-" + oldest_snapshot_version.toString();
     }
 
-    String get_newest_snapshot_name() throws RingoDBException {
+    private String get_newest_snapshot_name() throws RingoDBException {
         LOG.info(" get_newest_snapshot_name()");
 
         File dir = new File(SNAPSHOT_DIR()); //要遍历的目录
