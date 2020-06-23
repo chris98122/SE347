@@ -4,7 +4,7 @@ import lib.PrimaryService;
 import lib.WorkerService;
 import org.junit.Test;
 
-import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.Assert.assertEquals;
 
@@ -89,10 +89,10 @@ public class ScaleOutTest {
         Config.StartPrimary();//原本有两个worker已经在运行，所以initializeworker ok
         Thread.sleep(12000);
 
-        String workerargs[] = {Config.zookeeperHost, PrivateData.ip, "12302",
-                PrivateData.ip, "12302"
+        String workerargs[] = {Config.zookeeperHost, PrivateData.ip + ":12302",
+                PrivateData.ip + ":12302", "notrecover"
         };
-        Worker w = new Worker(workerargs[0], workerargs[1], workerargs[2], workerargs[3], workerargs[4]);
+        Worker w = new Worker(workerargs[0], workerargs[1], workerargs[2], workerargs[3]);
         w.registerRPCServices();
 
         ConsumerConfig<WorkerService> consumerConfig = new ConsumerConfig<WorkerService>()
@@ -105,7 +105,7 @@ public class ScaleOutTest {
         consumerConfig.refer().PUT("ringo", "apple");
         consumerConfig.refer().DELETE("ringo");
         DataTransferService S = w.GetDataTransferServiceByWorkerADDR(PrivateData.ip + ":12301");
-        TreeMap<String, String> m = new TreeMap<>();
+        ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>();
 
         for (Integer i = 0; i < 100; i++) {
             m.put(i.toString(), i.toString());
@@ -132,10 +132,10 @@ public class ScaleOutTest {
                 () ->
                 {
                     try {
-                        String workerargs[] = {Config.zookeeperHost, PrivateData.ip, "12302",
-                                PrivateData.ip, "12302"
+                        String workerargs[] = {Config.zookeeperHost, PrivateData.ip + ":12302",
+                                PrivateData.ip + ":12302", "NOTRECOVER"
                         };
-                        Worker w = new Worker(workerargs[0], workerargs[1], workerargs[2], workerargs[3], workerargs[4]);
+                        Worker w = new Worker(workerargs[0], workerargs[1], workerargs[2], workerargs[3]);
 
                         w.registerRPCServices();
                         ConsumerConfig<WorkerService> consumerConfig = new ConsumerConfig<WorkerService>()
@@ -147,7 +147,7 @@ public class ScaleOutTest {
                         consumerConfig.refer().PUT("ringo", "apple");
                         consumerConfig.refer().DELETE("ringo");
                         DataTransferService S = w.GetDataTransferServiceByWorkerADDR(PrivateData.ip + ":12301");
-                        TreeMap<String, String> m = new TreeMap<>();
+                        ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>();
                         m.put("ringo", "apple");
                         S.DoTransfer(m);
                         Thread.sleep(2000);

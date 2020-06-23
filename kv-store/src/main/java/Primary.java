@@ -78,6 +78,27 @@ public class Primary implements Watcher, PrimaryService {
             }
         }
     };
+    AsyncCallback.ChildrenCallback workerGetChildrenCallback = new AsyncCallback.ChildrenCallback() {
+        @Override
+        public void processResult(int rc, String path, Object ctx, List<String> children) {
+            switch (KeeperException.Code.get(rc)) {
+                case CONNECTIONLOSS:
+                    try {
+                        LOG.info("retry get workers");
+                        getWorkers();
+                    } catch (KeeperException | InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    break;
+                case OK:
+                    LOG.info("Successfully got a list of workers:" + children.size() + "workers");
+                    LOG.info(String.valueOf(children));
+                    break;
+                default:
+                    LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
+            }
+        }
+    };
     //主节点等待从节点的变化（包括worker node fail 或者 增加）
     //ZooKeeper客户端也可以通过getData，getChildren和exist三个接口来向ZooKeeper服务器注册Watcher
     Watcher workersChangeWatcher = new Watcher() {
@@ -103,27 +124,6 @@ public class Primary implements Watcher, PrimaryService {
                 } catch (KeeperException | InterruptedException keeperException) {
                     keeperException.printStackTrace();
                 }
-            }
-        }
-    };
-    AsyncCallback.ChildrenCallback workerGetChildrenCallback = new AsyncCallback.ChildrenCallback() {
-        @Override
-        public void processResult(int rc, String path, Object ctx, List<String> children) {
-            switch (KeeperException.Code.get(rc)) {
-                case CONNECTIONLOSS:
-                    try {
-                        LOG.info("retry get workers");
-                        getWorkers();
-                    } catch (KeeperException | InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    break;
-                case OK:
-                    LOG.info("Successfully got a list of workers:" + children.size() + "workers");
-                    LOG.info(String.valueOf(children));
-                    break;
-                default:
-                    LOG.error("getChildren failed", KeeperException.create(KeeperException.Code.get(rc), path));
             }
         }
     };

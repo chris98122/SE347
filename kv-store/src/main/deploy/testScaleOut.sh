@@ -19,8 +19,8 @@ cd worker3-primary
 sudo rm -rf log4j2.log
 sudo  find ./ -name 'snapshot*-*' -exec rm {} \;
 java -cp  ../kv-store/target/kv-store-1.0-SNAPSHOT.jar Worker  \
-112.124.23.139:2181,112.124.23.139:2182,112.124.23.139:2183 212.64.64.185 12301 \
-212.64.64.185 12301 &  #primary data node
+112.124.23.139:2181,112.124.23.139:2182,112.124.23.139:2183 212.64.64.185:12301 \
+212.64.64.185:12301 notrecover &  #primary data node
 cd ..
 
 #cd worker4-primary
@@ -35,14 +35,14 @@ cd worker3-standby1
 sudo rm -rf log4j2.log
 sudo  find ./ -name 'snapshot*-*' -exec rm {} \;
 java -cp  ../kv-store/target/kv-store-1.0-SNAPSHOT.jar Worker  112.124.23.139:2181,112.124.23.139:2182,112.124.23.139:2183 \
- 212.64.64.185 12301  212.64.64.185 12501  & #standyby1 data node
+ 212.64.64.185:12301  212.64.64.185:12501  notrecover & #standyby1 data node
 cd ..
 
 cd worker3-standby2
 sudo rm -rf log4j2.log
 sudo  find ./ -name 'snapshot*-*' -exec rm {} \;
 java -cp  ../kv-store/target/kv-store-1.0-SNAPSHOT.jar Worker  112.124.23.139:2181,112.124.23.139:2182,112.124.23.139:2183 \
- 212.64.64.185 12301  212.64.64.185 12502  & #standyby2 data node
+ 212.64.64.185:12301  212.64.64.185:12502  notrecover & #standyby2 data node
 cd ..
 
 #cd worker4-standby1

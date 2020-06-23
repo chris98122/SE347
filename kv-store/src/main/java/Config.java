@@ -27,10 +27,10 @@ public class Config {
                 {
                     try {
                         //primary data node
-                        String workerargs[] = {Config.zookeeperHost, PrivateData.ip, "1230" + workerID.toString(),
-                                PrivateData.ip, "1230" + workerID.toString()
+                        String workerargs[] = {Config.zookeeperHost, PrivateData.ip + ":1230" + workerID.toString(),
+                                PrivateData.ip + ":1230" + workerID.toString(), "notrecover"
                         };
-                        Worker w = new Worker(workerargs[0], workerargs[1], workerargs[2], workerargs[3], workerargs[4]);
+                        Worker w = new Worker(workerargs[0], workerargs[1], workerargs[2], workerargs[3]);
                         w.startZK();
                         w.registerRPCServices();// make sure the RPC can work, then register to zookeeper
                         w.runForPrimaryDataNode();// if the worker is a new one, master should call rpc SetKeyRange
@@ -53,8 +53,8 @@ public class Config {
                 () ->
                 {
                     try {
-                        String workerargs[] = {Config.zookeeperHost, PrivateData.ip, "1230" + workerID.toString(),
-                                PrivateData.ip, "1230" + workerID.toString()
+                        String workerargs[] = {Config.zookeeperHost, PrivateData.ip + ":1230" + workerID.toString(),
+                                PrivateData.ip + ":1230" + workerID.toString(), "notrecover"
                         };
                         Worker.main(workerargs);
                     } catch (Exception e) {
@@ -72,8 +72,8 @@ public class Config {
                 () ->
                 {
                     try {
-                        String workerargs[] = {Config.zookeeperHost, PrivateData.ip, "1230" + workerID.toString(),
-                                PrivateData.ip, "124" + workerID.toString() + standByID.toString()
+                        String workerargs[] = {Config.zookeeperHost, PrivateData.ip + ":1230" + workerID.toString(),
+                                PrivateData.ip + ":124" + workerID.toString() + standByID.toString(), "notrecover"
                         };
                         Worker.main(workerargs);
                     } catch (Exception e) {

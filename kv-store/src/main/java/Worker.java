@@ -27,6 +27,9 @@ import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
 
 public class Worker implements Watcher, WorkerService, DataTransferService {
     private static final Logger LOG = LoggerFactory.getLogger(Worker.class);
+
+    private final boolean isRecover;
+
     // primary data node metadata
     private final String primaryNodeIP;
     private final String primaryNodePort;
@@ -80,7 +83,14 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         }
     };
 
-    Worker(String zookeeperaddress, String primaryNodeIP, String primaryNodePort, String realIP, String realPort) throws UnknownHostException {
+    Worker(String zookeeperaddress, String primarynode, String realnode, String isrecover) throws UnknownHostException {
+        this.isRecover = isrecover.equals("isrecover");
+
+        String primaryNodeIP = primarynode.split(":")[0];
+        String primaryNodePort = primarynode.split(":")[1];
+
+        String realIP = realnode.split(":")[0];
+        String realPort = realnode.split(":")[1];
 
         this.primaryNodeIP = primaryNodeIP;
         this.primaryNodePort = primaryNodePort;
@@ -96,7 +106,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     }
 
     public static void main(String[] args) throws Exception {
-        Worker w = new Worker(args[0], args[1], args[2], args[3], args[4]);
+        Worker w = new Worker(args[0], args[1], args[2], args[3]);
         w.startZK();
         w.registerRPCServices();// make sure the RPC can work, then register to zookeeper
 
