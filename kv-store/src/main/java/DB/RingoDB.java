@@ -186,6 +186,7 @@ public enum RingoDB implements DB {
     }
 
     String get_newest_snapshot_name() {
+        LOG.info(" get_newest_snapshot_name()");
         File dir = new File(SNAPSHOT_DIR); //要遍历的目录
         //System.out.println(dir);
         if (dir.isDirectory()) {
@@ -195,6 +196,7 @@ public enum RingoDB implements DB {
                 if (children[i].split("-").length > 1 && children[i].split("-")[0].equals("snapshot")) {
                     try {
                         Integer version = Integer.valueOf(children[i].split("-")[1]);
+                        LOG.info("[RingoDB]"+version.toString());
                         snapshot_version = Math.max(snapshot_version, version);
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -202,6 +204,7 @@ public enum RingoDB implements DB {
                 }
             }
         }
+        LOG.info("snapshot-" + snapshot_version.toString());
         return "snapshot-" + snapshot_version.toString();
     }
 
