@@ -146,7 +146,7 @@ public enum RingoDB implements DB {
     private void checkKeyExists(String key) throws RingoDBException {
         if (!map.containsKey(key)) {
             //key 不存在
-            throw new RingoDBException("key not exists");
+            throw new RingoDBException.KeyNotExists();
         }
     }
 
@@ -282,14 +282,15 @@ public enum RingoDB implements DB {
         if (map.isEmpty()) {
             map = m1;
         } else {
-            // recovery
+            LOG.error("[recover] map is not empty");
+            throw new RingoDBException.MapNotEmpty();
         }
         printDBContent();// check if recover ok
     }
 
     private void checkKey(String key) throws RingoDBException {
         if (key == null) {
-            throw new RingoDBException("key is empty");
+            throw new RingoDBException.KeyEmpty();
         }
     }
 

@@ -548,12 +548,12 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             String res = RingoDB.INSTANCE.Get(key);
             LOG.info("[DB EXECUTION] GET" + key + "value:" + res);
             return res;
-        } catch (RingoDBException e) {
+        } catch (RingoDBException.KeyNotExists e) {
             e.printStackTrace();
             LOG.error(String.valueOf(e));
-            if (e.getMessage().equals("key not exists")) {
-                return "NO KEY";
-            }
+            return "NO KEY";
+        } catch (RingoDBException e) {
+            LOG.error(String.valueOf(e));
         } catch (MWException e) {
             e.printStackTrace();
             LOG.error(String.valueOf(e));
@@ -583,12 +583,12 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 }
             }
             return "OK";
-        } catch (RingoDBException e) {
+        } catch (RingoDBException.KeyNotExists e) {
             e.printStackTrace();
             LOG.error(String.valueOf(e));
-            if (e.getMessage().equals("key not exists")) {
-                return "NO KEY";
-            }
+            return "NO KEY";
+        } catch (RingoDBException e) {
+            LOG.error(String.valueOf(e));
         } catch (MWException e) {
             e.printStackTrace();
             LOG.error(String.valueOf(e));
