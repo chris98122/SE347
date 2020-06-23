@@ -11,9 +11,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public enum RingoDB implements DB {
     INSTANCE;
-
     private static final Logger LOG = LoggerFactory.getLogger(RingoDB.class);
     static AtomicInteger snapshot_version = new AtomicInteger(0);
+    private static String SNAPSHOT_DIR = null;
     ConcurrentHashMap<String, String> map = new ConcurrentHashMap<String, String>();
 
     public static Integer Hash(String string) {
@@ -164,8 +164,11 @@ public enum RingoDB implements DB {
     }
 
     String SNAPSHOT_DIR() {
-        File directory = new File("");
-        return directory.getAbsolutePath(); //获取绝对路径。
+        if (SNAPSHOT_DIR == null) {
+            File directory = new File("");
+            SNAPSHOT_DIR = directory.getAbsolutePath(); //获取绝对路径。
+        }
+        return SNAPSHOT_DIR;
     }
 
     String get_oldest_snapshot_name() {
@@ -248,7 +251,7 @@ public enum RingoDB implements DB {
                     // write something in the file
                     try {
                         assert oout != null;
-                        ConcurrentHashMap<String,String> copy = new   ConcurrentHashMap<String,String>();
+                        ConcurrentHashMap<String, String> copy = new ConcurrentHashMap<String, String>();
                         copy.putAll(map);
                         oout.writeObject(copy);
                     } catch (IOException e) {
