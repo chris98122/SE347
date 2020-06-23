@@ -15,7 +15,6 @@ public enum RingoDB implements DB {
     private static final Logger LOG = LoggerFactory.getLogger(RingoDB.class);
     static AtomicInteger snapshot_version = new AtomicInteger(0);
     ConcurrentHashMap<String, String> map = new ConcurrentHashMap<String, String>();
-    String SNAPSHOT_DIR = "./";
 
     public static Integer Hash(String string) {
         //加密后的字符串
@@ -164,8 +163,13 @@ public enum RingoDB implements DB {
         }
     }
 
+    String SNAPSHOT_DIR() {
+        File directory = new File("");
+        return directory.getAbsolutePath(); //获取绝对路径。
+    }
+
     String get_oldest_snapshot_name() {
-        File dir = new File(SNAPSHOT_DIR); //要遍历的目录
+        File dir = new File(SNAPSHOT_DIR()); //要遍历的目录
         Integer oldest_snapshot_version = Integer.MAX_VALUE;
         //System.out.println(dir);
         if (dir.isDirectory()) {
@@ -187,7 +191,8 @@ public enum RingoDB implements DB {
 
     String get_newest_snapshot_name() throws RingoDBException {
         LOG.info(" get_newest_snapshot_name()");
-        File dir = new File(SNAPSHOT_DIR); //要遍历的目录
+
+        File dir = new File(SNAPSHOT_DIR()); //要遍历的目录
         LOG.info(dir.getPath());
         Integer res = 0;
 

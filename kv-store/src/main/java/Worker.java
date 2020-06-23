@@ -209,28 +209,24 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         }
     }
 
-    private void RecoverFromSnapshot() {
+    private void RecoverFromSnapshot() throws RingoDBException, IOException, ClassNotFoundException {
         LOG.info("[DoRecover]RecoverFromSnapshot");
-        try {
-            RingoDB.INSTANCE.recover();
-        } catch (RingoDBException e) {
-            e.printStackTrace();
-            LOG.error("[DoRecover] RingoDBException");
-            LOG.error(String.valueOf(e));
-            LOG.error(e.getMessage());
-        } catch (Exception e) {
-            e.printStackTrace();
-            LOG.error(String.valueOf(e));
-        }
+        RingoDB.INSTANCE.recover();
     }
 
     public void DoRecover() {
         LOG.info("[DoRecover] START");
-        RecoverFromSnapshot();
-        LOG.info("[DoRecover]register worker watcher");
-        registerWorkerWatcher();
-        LOG.info("[DoRecover]checkPrimaryDataNode");
-        checkPrimaryDataNode();
+        try {
+            RecoverFromSnapshot();
+            LOG.info("[DoRecover]register worker watcher");
+            registerWorkerWatcher();
+            LOG.info("[DoRecover]checkPrimaryDataNode");
+            checkPrimaryDataNode();
+        } catch (Exception e) {
+            LOG.error(String.valueOf(e));
+            e.printStackTrace();
+            LOG.error(String.valueOf(e));
+        }
         this.isRecover = false;
     }
 
