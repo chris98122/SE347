@@ -111,7 +111,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
         while (true) {
             try {
-                TimeUnit.HOURS.sleep(1);//一小时snapshot一次
+                TimeUnit.MINUTES.sleep(1);//一分钟snapshot一次
                 RingoDB.INSTANCE.snapshot();//保存最新的2次snapshot
                 snapshotcounter++;
                 if (snapshotcounter >= 3) {
@@ -209,11 +209,23 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         }
     }
 
-    public void DoRecover() {
-        LOG.info("DoRecover START");
+    private void RecoverFromSnapshot() {
+        LOG.info("[DoRecover]RecoverFromSnapshot");
+        try {
+            RingoDB.INSTANCE.recover();
+        } catch (Exception e) {
+            e.printStackTrace();
+            LOG.error(String.valueOf(e));
+        }
+    }
 
-        LOG.info("register worker watcher");
+    public void DoRecover() {
+        LOG.info("[DoRecover] START");
+        RecoverFromSnapshot();
+        LOG.info("[DoRecover]register worker watcher");
         registerWorkerWatcher();
+        LOG.info("[DoRecover]checkPrimaryDataNode");
+        checkPrimaryDataNode();
     }
 
     public void registerWorkerWatcher() {

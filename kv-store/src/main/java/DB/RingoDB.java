@@ -249,6 +249,7 @@ public enum RingoDB implements DB {
         } else {
             // recovery
         }
+        printDBContent();// check if recover ok
     }
 
     private void checkKey(String key) throws RingoDBException {
