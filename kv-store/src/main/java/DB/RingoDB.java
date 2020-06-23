@@ -46,8 +46,7 @@ public enum RingoDB implements DB {
     public void setMap(ConcurrentHashMap<String, String> data) throws RingoDBException {
         try {
             assert map.isEmpty();
-            //   SOFARPC序列化还是有问题
-            map.putAll(data);
+            map = data;
             printDBContent();
         } catch (Exception e) {
             e.printStackTrace();
