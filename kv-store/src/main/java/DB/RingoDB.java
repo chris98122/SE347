@@ -248,7 +248,9 @@ public enum RingoDB implements DB {
                     // write something in the file
                     try {
                         assert oout != null;
-                        oout.writeObject(map);
+                        ConcurrentHashMap<String,String> copy = new   ConcurrentHashMap<String,String>();
+                        copy.putAll(map);
+                        oout.writeObject(copy);
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
