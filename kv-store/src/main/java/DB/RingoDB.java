@@ -55,6 +55,7 @@ public enum RingoDB implements DB {
     }
 
     public boolean hasValueInRange(String keyStart, String KeyEnd) throws RingoDBException {
+        // hasValueInRange用于检查是否有key在一致性哈希环上指定的范围内
         checkKey(keyStart);
         checkKey(KeyEnd);
         int keystart = Hash(keyStart);
@@ -91,7 +92,8 @@ public enum RingoDB implements DB {
     }
 
     public void TrunkMap(String keyStart, String KeyEnd) throws RingoDBException {
-        //save keyStart->KeyEnd
+        // save keyStart->KeyEnd
+        // TrunkMap用于仅仅保留在一致性哈希环上指定的范围内的键值对，而删除其他键值对
         int keystart = Hash(keyStart);
         int keyend = Hash(KeyEnd);
         printDBContent();
@@ -155,7 +157,7 @@ public enum RingoDB implements DB {
     public boolean delete_oldest_snapshot() {
         File file = new File(get_oldest_snapshot_name());
         if (!file.exists()) {
-            System.out.println("删除文件失败:" + get_oldest_snapshot_name() + "不存在！");
+            LOG.error("delete_oldest_snapshot FAIL!" + get_oldest_snapshot_name() + "not exist");
             return false;
         } else {
             return file.delete();
