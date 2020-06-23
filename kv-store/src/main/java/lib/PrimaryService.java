@@ -2,7 +2,7 @@ package lib;
 
 public interface PrimaryService {
     // for communication between Master and Client
-    // should be registeed in Master.java
+    // should be registeed in Primary.java
     String PUT(String key, String value);
 
     String GET(String key);
