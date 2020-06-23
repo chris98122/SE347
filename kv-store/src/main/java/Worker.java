@@ -15,6 +15,7 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -27,9 +28,6 @@ import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
 
 public class Worker implements Watcher, WorkerService, DataTransferService {
     private static final Logger LOG = LoggerFactory.getLogger(Worker.class);
-
-    private final boolean isRecover;
-
     // primary data node metadata
     private final String primaryNodeIP;
     private final String primaryNodePort;
@@ -39,6 +37,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     private final String realIP;
     private final String realPort;
     private final String zookeeperaddress;
+    volatile boolean isRecover;
     ZooKeeper zk;
     volatile HashMap<String, ReentrantReadWriteLock> keyRWLockMap = new HashMap<String, ReentrantReadWriteLock>();
     volatile private Set<String> StandBySet = new HashSet<String>();
@@ -103,6 +102,26 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         this.realAddress = realIP + ":" + realPort;
         // realAddress is the address worker actually runs on
         LOG.info("WORKER METADATA:" + " [primaryNodeAddr] " + primaryNodeAddr + " [realAddress] " + realAddress);
+        if (this.isRecover)
+            LOG.info("is gonna recover");
+    }
+
+    public static void DoSnapshot() {
+        int snapshotcounter = 0;
+
+        while (true) {
+            try {
+                TimeUnit.HOURS.sleep(1);//一小时snapshot一次
+                RingoDB.INSTANCE.snapshot();//保存最新的2次snapshot
+                snapshotcounter++;
+                if (snapshotcounter >= 3) {
+                    // 删除snapshot
+                    RingoDB.INSTANCE.delete_oldest_snapshot();
+                }
+            } catch (InterruptedException | IOException e) {
+                LOG.error(String.valueOf(e));
+            }
+        }
     }
 
     public static void main(String[] args) throws Exception {
@@ -111,71 +130,57 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         w.registerRPCServices();// make sure the RPC can work, then register to zookeeper
 
         //保证Primary worker先抢占到领导权
-        if (w.primaryNodeAddr.equals(w.realAddress))
-            w.runForPrimaryDataNode();
-
-        if (w.isPrimary) {
-            {
-                //  make sure there is at least 2 standby node
-            }
-        } else {
-            try {
-                String res = w.GetWorkerServiceByWorkerADDR(w.primaryNodeAddr).RegisterAsStandBy(w.realAddress);
-                if (!res.equals("OK")) {
-                    LOG.error(" RegisterAsStandBy FAIL");
-                } else {
-                    LOG.info("RegisterAsStandBy OK");
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-                LOG.error(String.valueOf(e));
-            }
-        }
-
-        //保证Primary worker的StandBy node都注册好了之后再等待SetKeyRange
-        if (w.isPrimary) {
-            while (w.StandBySet.size() < 2)
-                TimeUnit.SECONDS.sleep(10);
-        }
-
-        if (w.isPrimary) {
-            // if the worker is a new one, primary should call rpc SetKeyRange(startKey,endKey,true)
-            // 对于leader Data Node来说，
-            // 如果没有收到setKeyRange()就重新连接zookeeper
-            // 这个情况适用于 InitialhashWorkers和ScaleOut 两者中的setKeyRange()
-
-            TimeUnit.MINUTES.sleep(1);
-            while (w.KeyStart == null) {
-                LOG.warn("the KeyRange is not initialized,retry");
-                w.zk.close();
-                try {
-                    w.startZK();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    LOG.error(String.valueOf(e));
-                }
+        if (!w.isRecover) {
+            if (w.primaryNodeAddr.equals(w.realAddress))
                 w.runForPrimaryDataNode();
-                TimeUnit.MINUTES.sleep(2);
+
+            if (w.isPrimary) {
+                {
+                    //  make sure there is at least 2 standby node
+                }
+            } else {
+                w.StandByDoRegister(w.primaryNodeAddr);
             }
+
+            //保证Primary worker的StandBy node都注册好了之后再等待SetKeyRange
+            if (w.isPrimary) {
+                while (w.StandBySet.size() < 2)
+                    TimeUnit.SECONDS.sleep(10);
+            }
+
+            if (w.isPrimary) {
+                // if the worker is a new one, primary should call rpc SetKeyRange(startKey,endKey,true)
+                // 对于leader Data Node来说，
+                // 如果没有收到setKeyRange()就重新连接zookeeper
+                // 这个情况适用于 InitialhashWorkers和ScaleOut 两者中的setKeyRange()
+
+                TimeUnit.MINUTES.sleep(1);
+                while (w.KeyStart == null) {
+                    LOG.warn("the KeyRange is not initialized,retry");
+                    w.zk.close();
+                    try {
+                        w.startZK();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        LOG.error(String.valueOf(e));
+                    }
+                    w.runForPrimaryDataNode();
+                    TimeUnit.MINUTES.sleep(2);
+                }
+            }
+            LOG.info("register worker watcher");
+            w.registerWorkerWatcher();
+            //如果是primary data node 在初始化KeyRange之后注册watcher
+            //如果是standby data node 直接注册watcher
+        } else {
+            // is recover
+            w.DoRecover();
         }
-        LOG.info("register worker watcher");
-        w.registerWorkerWatcher();
-        //如果是primary data node 在初始化KeyRange之后注册watcher
-        //如果是standby data node 直接注册watcher
 
         // 不论是否是primary data node都进行snapshot
-        int snapshotcounter = 0;
-
-        while (true) {
-            TimeUnit.HOURS.sleep(1);//一小时snapshot一次
-            RingoDB.INSTANCE.snapshot();//保存最新的2次snapshot
-            snapshotcounter++;
-            if (snapshotcounter >= 3) {
-                // 删除snapshot
-                RingoDB.INSTANCE.delete_oldest_snapshot();
-            }
+        if (w.isRecover) {//means don't need recover or recover finish
+            DoSnapshot();
         }
-
     }
 
     public static Integer Hash(String string) {
@@ -183,6 +188,32 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         String encodeStr = DigestUtils.md5Hex(string);
         //System.out.println("MD5加密后的字符串为:encodeStr="+encodeStr);
         return encodeStr.hashCode();
+    }
+
+    public void StandByDoRegister(String primaryNodeAddr) {
+        int retrycounter = 0;
+        while (retrycounter < 2) {
+            try {
+                String res = GetWorkerServiceByWorkerADDR(primaryNodeAddr).RegisterAsStandBy(this.realAddress);
+                if (!res.equals("OK")) {
+                    LOG.error("RegisterAsStandBy FAIL");
+                } else {
+                    LOG.info("RegisterAsStandBy OK");
+                    break;
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                LOG.error(String.valueOf(e));
+            }
+            retrycounter++;
+        }
+    }
+
+    public void DoRecover() {
+        LOG.info("DoRecover START");
+
+        LOG.info("register worker watcher");
+        registerWorkerWatcher();
     }
 
     public void registerWorkerWatcher() {
@@ -211,17 +242,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     LOG.info(realAddress + "is already the primary Data Node");
                 } else {
                     //register to the leader node
-                    try {
-                        String res = GetWorkerServiceByWorkerADDR(new String(data)).RegisterAsStandBy(this.realAddress);
-                        if (!res.equals("OK")) {
-                            LOG.error(" RegisterAsStandBy FAIL");
-                        } else {
-                            LOG.info("RegisterAsStandBy OK");
-                        }
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        LOG.error(String.valueOf(e));
-                    }
+                    StandByDoRegister(new String(data));
                 }
                 return true;
             } catch (KeeperException.NoNodeException e) {
