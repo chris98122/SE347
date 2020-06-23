@@ -198,7 +198,14 @@ public enum RingoDB implements DB {
 
         if (dir.isDirectory()) {
             String[] children = dir.list();
-            if (children.length == 0) {
+            int snapshotnum = 0;
+            for (int i = 0; i < children.length; i++) {
+                //System.out.println(children[i]);
+                if (children[i].split("-").length > 1 && children[i].split("-")[0].equals("snapshot")) {
+                    snapshotnum++;
+                }
+            }
+            if (snapshotnum == 0) {
                 throw new RingoDBException.NoSnapshot();
             }
             for (int i = 0; i < children.length; i++) {
@@ -213,7 +220,6 @@ public enum RingoDB implements DB {
                     }
                 }
             }
-
         } else {
             throw new RingoDBException("wrong directory");
         }
