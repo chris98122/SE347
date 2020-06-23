@@ -55,7 +55,7 @@ public enum RingoDB implements DB {
         }
     }
 
-    public synchronized boolean hasValueInRange(String keyStart, String KeyEnd) throws RingoDBException {
+    public boolean hasValueInRange(String keyStart, String KeyEnd) throws RingoDBException {
         checkKey(keyStart);
         checkKey(KeyEnd);
         int keystart = Hash(keyStart);
