@@ -25,7 +25,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
 
@@ -42,7 +41,6 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     private final String zookeeperaddress;
     volatile boolean isRecover;
     ZooKeeper zk;
-    volatile HashMap<String, ReentrantReadWriteLock> keyRWLockMap = new HashMap<String, ReentrantReadWriteLock>();
     AtomicInteger CopyToStandbyCounter = new AtomicInteger(0);
     BlockingQueue<CopyToStandBy> CopyQueue = new LinkedBlockingQueue<CopyToStandBy>(10);//容纳10个CopyToStandBy线程
     volatile private Set<String> StandBySet = new HashSet<String>();
@@ -515,19 +513,10 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             {
                 // 主节点通过异步的方式将新的数据同步到对应的从节点，
                 // 不过在某些情况下会造成写丢失
-                if (isPrimary) {
-                    // concurrency control
-                    // make writes to the same key sequential
-
-                    CopyToStandBy copyToStandBy = new CopyToStandBy(key, value, StandBySet, EXECUTION.PUT, null);
+                if (isPrimary) { 
+                    CopyToStandBy copyToStandBy = new CopyToStandBy(key, value, StandBySet, EXECUTION.PUT);
                     copyToStandBy.setName("CopyToStandBy put " + key + "-" + CopyToStandbyCounter.getAndIncrement());
                     CopyQueue.add(copyToStandBy);
-//                    copyToStandBy.start();
-//                    copyToStandBy.run();
-//                    while (!lock.isWriteLocked()) {
-//                        //保证copyToStandBy拿到锁
-//                        // LOG.info("CopyToStandBy getting lock" + key);
-//                    }
                 }
             }
             return "OK";
@@ -538,16 +527,6 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         return "ERR";
     }
 
-    private ReentrantReadWriteLock GetRWlock(String key) {
-        ReentrantReadWriteLock lock;
-        if (keyRWLockMap.containsKey(key)) {
-            lock = keyRWLockMap.get(key);
-        } else {
-            lock = new ReentrantReadWriteLock();
-            keyRWLockMap.put(key, lock);
-        }
-        return lock;
-    }
 
     @Override
     public String GET(String key) {
@@ -580,15 +559,9 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 // 主节点通过异步的方式将新的数据同步到对应的从节点，
                 // 不过在某些情况下会造成写丢失
                 if (isPrimary) {
-                    // 只有拿到锁才能启动线程
-
-                    CopyToStandBy copyToStandBy = new CopyToStandBy(key, null, StandBySet, EXECUTION.DELETE, null);
+                    CopyToStandBy copyToStandBy = new CopyToStandBy(key, null, StandBySet, EXECUTION.DELETE);
                     copyToStandBy.setName("CopyToStandBy delete " + key + "-" + CopyToStandbyCounter.getAndIncrement());
                     CopyQueue.add(copyToStandBy);
-//                    copyToStandBy.run();
-//                    while (!lock.isWriteLocked()) {
-//                        //保证copyToStandBy拿到锁
-//                    }
                 }
             }
             return "OK";
@@ -728,24 +701,17 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
         public String value = null;
         public Set<String> standbySet = null;
         public EXECUTION execution = null;
-        public ReentrantReadWriteLock lock = null;
 
-        CopyToStandBy(String key, String value, Set<String> standbySet, EXECUTION execution, ReentrantReadWriteLock lock) {
+        CopyToStandBy(String key, String value, Set<String> standbySet, EXECUTION execution) {
             super();
             this.key = key;
             this.value = value;
             this.standbySet = standbySet;
             this.execution = execution;
-            this.lock = lock;
         }
 
         public void run() {
-            // LOG.info("copyToStandBy RUNNING");
-            //先拿锁
-            ReentrantReadWriteLock lock = GetRWlock(key);
-            this.lock = lock;
-            this.lock.writeLock().lock();
-            LOG.info("CopyToStandBy GET LOCK OF" + key);
+
             for (String standbyAddr : this.standbySet) {
                 LOG.info("ready to send " + standbyAddr);
                 String res = null;
@@ -773,14 +739,6 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     res = "ERR";
                     LOG.info(standbyAddr + " " + res);
                 }
-            }
-            if (!lock.hasQueuedThreads()) {
-                lock.writeLock().unlock();
-                LOG.info(" keyRWLockMap.remove(key) ");
-                keyRWLockMap.remove(key);
-            } else {
-                LOG.info("hasQueuedThreads");
-                lock.writeLock().unlock();
             }
         }
     }
