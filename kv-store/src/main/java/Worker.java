@@ -715,7 +715,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     CopyToStandBy c = this.CopyQueue.take();
                     LOG.info("[RunCopyToStandBy]" + c.getName());
                     c.start();
-                    yield();
+                    c.join();
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
