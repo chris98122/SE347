@@ -465,7 +465,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
                     RunCopyToStandBy r = new RunCopyToStandBy(this.CopyQueue);
                     r.setName("RunCopyToStandBy");
-                    r.run();
+                    r.start();
                 }
                 return "OK";
             }
