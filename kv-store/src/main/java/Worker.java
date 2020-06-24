@@ -42,7 +42,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     volatile boolean isRecover;
     ZooKeeper zk;
     AtomicInteger CopyToStandbyCounter = new AtomicInteger(0);
-    BlockingQueue<CopyToStandBy> CopyQueue = new LinkedBlockingQueue<CopyToStandBy>(10);//容纳10个CopyToStandBy线程
+    BlockingQueue<CopyToStandBy> CopyQueue = new LinkedBlockingQueue<CopyToStandBy>(100);//容纳100个CopyToStandBy线程
     volatile private Set<String> StandBySet = new HashSet<String>();
     volatile private String KeyStart = null;
     private String KeyEnd = null;
@@ -463,6 +463,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
                     RunCopyToStandBy r = new RunCopyToStandBy(this.CopyQueue);
                     r.setName("RunCopyToStandBy");
+                    r.setPriority(Thread.MAX_PRIORITY);
                     r.start();
                 }
                 return "OK";
@@ -516,7 +517,11 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 if (isPrimary) {
                     CopyToStandBy copyToStandBy = new CopyToStandBy(key, value, StandBySet, EXECUTION.PUT);
                     copyToStandBy.setName("CopyToStandBy put " + key + "-" + CopyToStandbyCounter.getAndIncrement());
-                    CopyQueue.add(copyToStandBy);
+                    copyToStandBy.setPriority(Thread.MAX_PRIORITY);
+                    if(!CopyQueue.offer(copyToStandBy))
+                    {
+                        LOG.warn("copyqueue FULL");
+                    }
                 }
             }
             return "OK";
@@ -561,7 +566,12 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                 if (isPrimary) {
                     CopyToStandBy copyToStandBy = new CopyToStandBy(key, null, StandBySet, EXECUTION.DELETE);
                     copyToStandBy.setName("CopyToStandBy delete " + key + "-" + CopyToStandbyCounter.getAndIncrement());
+                    copyToStandBy.setPriority(Thread.MAX_PRIORITY);
                     CopyQueue.add(copyToStandBy);
+                    if(!CopyQueue.offer(copyToStandBy))
+                    {
+                        LOG.warn("copyqueue FULL");
+                    }
                 }
             }
             return "OK";
