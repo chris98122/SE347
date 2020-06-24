@@ -482,7 +482,7 @@ public class Primary implements Watcher, PrimaryService {
 
     void run() throws InterruptedException {
         while (true) {
-            Thread.sleep(60);
+            TimeUnit.HOURS.sleep(1);
         }
     }
 
@@ -562,13 +562,9 @@ public class Primary implements Watcher, PrimaryService {
 
     @Override
     public String notifyTransferFinish(String WorkerSenderAddr, String newKeyEnd) {
-//        workerkeymap.get(WorkerSenderAddr).set(1, newKeyEnd);
-//        synchronized (workerState) {
-//            workerState.put(WorkerSenderAddr, WORKERSTATE.READWRITE);
-//        }
         LOG.info("GET notifyTransferFinish");
         while (DataTransfertLatch.getCount() != 1) {
-            //spin
+            Thread.yield();
         }
         DataTransfertLatch.countDown();
         return "OK";
@@ -667,7 +663,7 @@ public class Primary implements Watcher, PrimaryService {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-                // 事实上如果primary 繁忙，scaleout 线程几乎不会被调度到
+
                 ScaleOut scaleOut = new ScaleOut();
                 scaleOut.setName("scaleOut" + ScaleOutCounter.getAndIncrement());
                 scaleOut.setPriority(Thread.MAX_PRIORITY);//例如processworker程启动scaleout线程，则scaleout的优先级应该也是10

@@ -513,7 +513,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             {
                 // 主节点通过异步的方式将新的数据同步到对应的从节点，
                 // 不过在某些情况下会造成写丢失
-                if (isPrimary) { 
+                if (isPrimary) {
                     CopyToStandBy copyToStandBy = new CopyToStandBy(key, value, StandBySet, EXECUTION.PUT);
                     copyToStandBy.setName("CopyToStandBy put " + key + "-" + CopyToStandbyCounter.getAndIncrement());
                     CopyQueue.add(copyToStandBy);
