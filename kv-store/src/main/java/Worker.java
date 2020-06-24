@@ -20,7 +20,9 @@ import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -41,17 +43,14 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
     volatile boolean isRecover;
     ZooKeeper zk;
     volatile HashMap<String, ReentrantReadWriteLock> keyRWLockMap = new HashMap<String, ReentrantReadWriteLock>();
+    AtomicInteger CopyToStandbyCounter = new AtomicInteger(0);
+    BlockingQueue<CopyToStandBy> CopyQueue = new LinkedBlockingQueue<CopyToStandBy>(10);//容纳10个CopyToStandBy线程
     volatile private Set<String> StandBySet = new HashSet<String>();
     volatile private String KeyStart = null;
     private String KeyEnd = null;
     // stores workerAddr -->ConsumerConfig mapping
     volatile private HashMap<String, ConsumerConfig<WorkerService>> workerConsumerConfigHashMap = new HashMap<String, ConsumerConfig<WorkerService>>();
     volatile private boolean isPrimary;
-
-
-    AtomicInteger CopyToStandbyCounter = new AtomicInteger(0);
-
-
     Watcher workerExistsWatcher = new Watcher() {
         public void process(WatchedEvent e) {
             LOG.info("workerExistsWatcher" + e.getPath());
@@ -463,6 +462,10 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     });
                     t.setName("Set STANDBY KeyRange");
                     t.start();
+
+                    RunCopyToStandBy r = new RunCopyToStandBy(this.CopyQueue);
+                    r.setName("RunCopyToStandBy");
+                    r.run();
                 }
                 return "OK";
             }
@@ -517,8 +520,9 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     // make writes to the same key sequential
 
                     CopyToStandBy copyToStandBy = new CopyToStandBy(key, value, StandBySet, EXECUTION.PUT, null);
-                    copyToStandBy.setName("CopyToStandBy put " + key +"-"+CopyToStandbyCounter.getAndIncrement());
-                    copyToStandBy.start();
+                    copyToStandBy.setName("CopyToStandBy put " + key + "-" + CopyToStandbyCounter.getAndIncrement());
+                    CopyQueue.add(copyToStandBy);
+//                    copyToStandBy.start();
 //                    copyToStandBy.run();
 //                    while (!lock.isWriteLocked()) {
 //                        //保证copyToStandBy拿到锁
@@ -579,8 +583,8 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     // 只有拿到锁才能启动线程
 
                     CopyToStandBy copyToStandBy = new CopyToStandBy(key, null, StandBySet, EXECUTION.DELETE, null);
-                    copyToStandBy.setName("CopyToStandBy delete " + key+"-"+CopyToStandbyCounter.getAndIncrement());
-                    copyToStandBy.start();
+                    copyToStandBy.setName("CopyToStandBy delete " + key + "-" + CopyToStandbyCounter.getAndIncrement());
+                    CopyQueue.add(copyToStandBy);
 //                    copyToStandBy.run();
 //                    while (!lock.isWriteLocked()) {
 //                        //保证copyToStandBy拿到锁
@@ -696,6 +700,25 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
 
     public enum EXECUTION {
         PUT, DELETE
+    }
+
+    class RunCopyToStandBy extends Thread {
+        public BlockingQueue<CopyToStandBy> CopyQueue;
+
+        RunCopyToStandBy(BlockingQueue<CopyToStandBy> CopyQueue) {
+            this.CopyQueue = CopyQueue;
+        }
+
+        public void run() {
+            while (true) {
+                try {
+                    CopyToStandBy c = this.CopyQueue.take();
+                    c.start();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 
     class CopyToStandBy extends Thread {
