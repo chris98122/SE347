@@ -460,12 +460,11 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     });
                     t.setName("Set STANDBY KeyRange");
                     t.start();
-
-                    RunCopyToStandBy r = new RunCopyToStandBy(this.CopyQueue);
-                    r.setName("RunCopyToStandBy");
-                    r.setPriority(Thread.MAX_PRIORITY);
-                    r.start();
                 }
+                RunCopyToStandBy r = new RunCopyToStandBy(this.CopyQueue);
+                r.setName("RunCopyToStandBy");
+                r.setPriority(Thread.MAX_PRIORITY);
+                r.start();
                 return "OK";
             }
         } else {
@@ -518,8 +517,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     CopyToStandBy copyToStandBy = new CopyToStandBy(key, value, StandBySet, EXECUTION.PUT);
                     copyToStandBy.setName("CopyToStandBy put " + key + "-" + CopyToStandbyCounter.getAndIncrement());
                     copyToStandBy.setPriority(Thread.MAX_PRIORITY);
-                    if(!CopyQueue.offer(copyToStandBy))
-                    {
+                    if (!CopyQueue.offer(copyToStandBy)) {
                         LOG.warn("copyqueue FULL");
                     }
                 }
@@ -568,8 +566,7 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     copyToStandBy.setName("CopyToStandBy delete " + key + "-" + CopyToStandbyCounter.getAndIncrement());
                     copyToStandBy.setPriority(Thread.MAX_PRIORITY);
                     CopyQueue.add(copyToStandBy);
-                    if(!CopyQueue.offer(copyToStandBy))
-                    {
+                    if (!CopyQueue.offer(copyToStandBy)) {
                         LOG.warn("copyqueue FULL");
                     }
                 }
