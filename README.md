@@ -1,0 +1,3 @@
+# SE347
+⚫ 由三个结点组成的 ZOOKEEPER 集群存储系统的元数据 ⚫ 系统由一个 primary 结点、至少大于等于 2 个的 worker 结点以及每个 worker 的 stand by 结点组成 ⚫ 实现了一个简单的 KV 内存数据库 RingoDB，Key 和 Value 的类型都是 String ⚫ Client 能做 PUT, GET, DELETE 三个操作 ⚫ 在client、primary结点、worker结点（包括primary data node和standby data node） 之间的通信都使用 SofaRPC ⚫ 支持 Scale Out，实现了自己的一致性哈希算法，可以动态加入 worker 结点，并在 Scale Out 过程中只影响一部分数据的写操作，读操作不受影响 ⚫ 支持 multi-client 与 Concurrent Data Accessing ⚫ primary data node 异步复制数据到 standby data node，当 primary data node FAIL， ZOOKEEPER 会选举一个 standby data node 成为 primary data node。 
+⚫ 所有 data node 都会每隔一段时间将数据库的 snapshot 写入磁盘，worker FAIL 之 后 recover 时会读取该 snapshot 
