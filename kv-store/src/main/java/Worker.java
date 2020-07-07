@@ -438,6 +438,10 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
             return "ERR";
         }
         if (this.KeyStart == null && this.KeyEnd == null) {
+            RunCopyToStandBy r = new RunCopyToStandBy(this.CopyQueue);
+            r.setName("RunCopyToStandBy");
+            r.setPriority(Thread.MAX_PRIORITY);
+            r.start();
             if (!dataTranfer) {
                 this.KeyStart = keystart;
                 this.KeyEnd = keyend;
@@ -461,10 +465,6 @@ public class Worker implements Watcher, WorkerService, DataTransferService {
                     t.setName("Set STANDBY KeyRange");
                     t.start();
                 }
-                RunCopyToStandBy r = new RunCopyToStandBy(this.CopyQueue);
-                r.setName("RunCopyToStandBy");
-                r.setPriority(Thread.MAX_PRIORITY);
-                r.start();
                 return "OK";
             }
         } else {
